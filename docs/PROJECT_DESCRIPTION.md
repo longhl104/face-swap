@@ -24,6 +24,19 @@ The system must support **both images and videos**.
 
 ---
 
+## **How to Download the Dataset**
+
+```python
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("atulanandjha/lfwpeople")
+
+print("Path to dataset files:", path)
+```
+
+---
+
 ## **Bonus: Video Support**
 
 - **Video Face Swapping:**  
