@@ -1,0 +1,35 @@
+# Face Swap System Configuration
+
+# Image dimensions (faces are resized to square crops)
+image_size: 128
+
+# Training hyperparameters
+training:
+  batch_size: 32
+  epochs: 50
+  learning_rate: 0.0002
+  latent_dim: 256
+  identity_weight: 1.0
+  reconstruction_weight: 10.0
+  val_split: 0.1
+  num_workers: 2
+  checkpoint_every: 5
+
+# Inference settings
+inference:
+  blend_ratio: 0.85
+  feather_kernel: 15
+
+# Video processing (bonus)
+video:
+  temporal_alpha: 0.7        # EMA smoothing factor (higher = smoother)
+  max_fps: 30
+
+# Storage paths (relative to project root)
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  uploads: data/uploads
+  model_weights: models/weights
+  training_output: outputs/training
+  inference_output: outputs/inference
