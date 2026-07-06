@@ -1,40 +1,38 @@
-"""Identity embedding extractor (FaceNet-style encoder)."""
+"""Pretrained FaceNet identity extractor (frozen feature extractor)."""
 
 from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from facenet_pytorch import InceptionResnetV1
+
+FACENET_EMBEDDING_DIM = 512
 
 
-class IdentityExtractor(nn.Module):
+class FaceNetIdentityExtractor(nn.Module):
     """
-    Convolutional encoder that maps a face image to a fixed-size
-    identity embedding vector (ArcFace/FaceNet-style).
+    Frozen pretrained FaceNet (InceptionResnetV1) for identity embeddings.
+
+    Uses VGGFace2 weights via facenet-pytorch. Not trained as part of this
+    project — only the generator learns to use these fixed embeddings.
     """
 
-    def __init__(self, embedding_dim: int = 256) -> None:
+    def __init__(self, pretrained: str = "vggface2") -> None:
         super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(3, 32, 4, 2, 1),
-            nn.BatchNorm2d(32),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(32, 64, 4, 2, 1),
-            nn.BatchNorm2d(64),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(64, 128, 4, 2, 1),
-            nn.BatchNorm2d(128),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(128, 256, 4, 2, 1),
-            nn.BatchNorm2d(256),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(256, 512, 4, 2, 1),
-            nn.BatchNorm2d(512),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.AdaptiveAvgPool2d(1),
-        )
-        self.fc = nn.Linear(512, embedding_dim)
+        self.model = InceptionResnetV1(pretrained=pretrained).eval()
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+    @property
+    def embedding_dim(self) -> int:
+        return FACENET_EMBEDDING_DIM
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        features = self.encoder(x).view(x.size(0), -1)
-        embedding = self.fc(features)
-        return nn.functional.normalize(embedding, p=2, dim=1)
+        # Input: BCHW in [-1, 1] at project image_size (e.g. 128x128)
+        x = F.interpolate(x, size=(160, 160), mode="bilinear", align_corners=False)
+        # FaceNet standardization: (pixel - 127.5) / 128
+        x = (x + 1.0) * 127.5
+        x = (x - 127.5) / 128.0
+        embedding = self.model(x)
+        return F.normalize(embedding, p=2, dim=1)

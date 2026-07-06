@@ -27,16 +27,15 @@ class FaceSwapEngine:
         infer_cfg = self.config["inference"]
 
         self.preprocessor = FacePreprocessor(image_size=self.image_size)
+        train_cfg = self.config["training"]
         self.model = FaceSwapModel(
-            identity_dim=self.config["training"]["latent_dim"]
+            facenet_pretrained=train_cfg.get("facenet_pretrained", "vggface2"),
         ).to(self.device)
 
         weights = model_path or self.paths.best_model_path
         if weights.exists():
-            self.model.load_state_dict(
-                torch.load(weights, map_location=self.device, weights_only=True)
-            )
-            print(f"Loaded model weights from {weights}")
+            self.model.load_trainable(weights, map_location=self.device)
+            print(f"Loaded generator weights from {weights}")
         else:
             print(f"Warning: No weights found at {weights}. Using untrained model.")
 
@@ -49,7 +48,7 @@ class FaceSwapEngine:
         return tensor.unsqueeze(0).to(self.device)
 
     def _from_tensor(self, tensor: torch.Tensor) -> np.ndarray:
-        face = tensor.squeeze(0).permute(1, 2, 0).cpu().numpy()
+        face = tensor.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
         return np.clip((face + 1.0) * 127.5, 0, 255).astype(np.uint8)
 
     @torch.no_grad()

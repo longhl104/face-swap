@@ -27,7 +27,7 @@ class FaceSwapGenerator(nn.Module):
     and a source identity embedding to produce a swapped face.
     """
 
-    def __init__(self, identity_dim: int = 256) -> None:
+    def __init__(self, identity_dim: int = 512) -> None:
         super().__init__()
         # Encoder
         self.enc1 = nn.Sequential(nn.Conv2d(3, 64, 7, 1, 3), nn.ReLU(inplace=True))
@@ -45,10 +45,10 @@ class FaceSwapGenerator(nn.Module):
             ResidualBlock(512),
         )
 
-        # Decoder
-        self.dec4 = nn.Sequential(nn.ConvTranspose2d(1024, 256, 4, 2, 1), nn.ReLU(inplace=True))
-        self.dec3 = nn.Sequential(nn.ConvTranspose2d(512, 128, 4, 2, 1), nn.ReLU(inplace=True))
-        self.dec2 = nn.Sequential(nn.ConvTranspose2d(256, 64, 4, 2, 1), nn.ReLU(inplace=True))
+        # Decoder: upsample first, then concatenate skip connections
+        self.up4 = nn.Sequential(nn.ConvTranspose2d(512, 256, 4, 2, 1), nn.ReLU(inplace=True))
+        self.up3 = nn.Sequential(nn.ConvTranspose2d(512, 128, 4, 2, 1), nn.ReLU(inplace=True))
+        self.up2 = nn.Sequential(nn.ConvTranspose2d(256, 64, 4, 2, 1), nn.ReLU(inplace=True))
         self.dec1 = nn.Sequential(nn.Conv2d(128, 3, 7, 1, 3), nn.Tanh())
 
     def forward(self, target_face: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
@@ -62,10 +62,13 @@ class FaceSwapGenerator(nn.Module):
         id_map = id_map.expand(-1, -1, e4.size(2), e4.size(3))
         bottleneck = self.bottleneck(e4 + id_map)
 
-        d4 = self.dec4(torch.cat([bottleneck, e3], dim=1))
-        d3 = self.dec3(torch.cat([d4, e2], dim=1))
-        d2 = self.dec2(torch.cat([d3, e1], dim=1))
-        return self.dec1(torch.cat([d2, e1], dim=1))
+        d4 = self.up4(bottleneck)
+        d4 = torch.cat([d4, e3], dim=1)
+        d3 = self.up3(d4)
+        d3 = torch.cat([d3, e2], dim=1)
+        d2 = self.up2(d3)
+        d2 = torch.cat([d2, e1], dim=1)
+        return self.dec1(d2)
 
 
 class Discriminator(nn.Module):

@@ -8,6 +8,10 @@ Pillow>=10.0.0
 # Face detection & alignment
 mediapipe>=0.10.0
 
+# Pretrained identity extractor (frozen at train time)
+# On Python 3.14+: pip install facenet-pytorch --no-deps
+facenet-pytorch>=2.5.0
+
 # Dataset
 kagglehub>=0.2.0
 

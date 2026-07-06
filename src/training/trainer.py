@@ -22,6 +22,19 @@ def cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> float:
     return F.cosine_similarity(a, b, dim=1).mean().item()
 
 
+def _shuffled_pairs(batch: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Create cross-identity source/target pairs within a batch."""
+    batch_size = batch.size(0)
+    if batch_size < 2:
+        return batch, batch
+
+    perm = torch.randperm(batch_size, device=batch.device)
+    same = perm == torch.arange(batch_size, device=batch.device)
+    while same.any():
+        perm[same] = torch.randperm(batch_size, device=batch.device)[same]
+    return batch, batch[perm]
+
+
 def train_epoch(
     model: FaceSwapModel,
     loader: DataLoader,
@@ -30,19 +43,23 @@ def train_epoch(
     id_weight: float,
     recon_weight: float,
 ) -> tuple[float, float, float]:
-    model.train()
+    model.generator.train()
     total_loss = id_total = recon_total = 0.0
 
     for batch in tqdm(loader, desc="Training", leave=False):
         batch = batch.to(device)
-        # Self-reconstruction: source == target for unsupervised training
-        source = batch
-        target = batch
+        source, target = _shuffled_pairs(batch)
 
-        identity = model.extract_identity(source)
+        # Frozen FaceNet: source identity embedding (no grad to extractor)
+        with torch.no_grad():
+            identity = model.extract_identity(source)
+
         output = model.generator(target, identity)
 
-        id_loss = F.mse_loss(model.extract_identity(output), identity)
+        # Identity loss: output should match source identity (grad flows to generator)
+        id_loss = 1.0 - F.cosine_similarity(
+            model.extract_identity(output), identity, dim=1
+        ).mean()
         recon_loss = F.l1_loss(output, target)
         loss = id_weight * id_loss + recon_weight * recon_loss
 
@@ -66,17 +83,21 @@ def validate(
     id_weight: float,
     recon_weight: float,
 ) -> tuple[float, float, float, float]:
-    model.eval()
+    model.generator.eval()
     total_loss = id_total = recon_total = 0.0
     similarities: list[float] = []
 
     for batch in loader:
         batch = batch.to(device)
-        identity = model.extract_identity(batch)
-        output = model.generator(batch, identity)
+        source, target = _shuffled_pairs(batch)
 
-        id_loss = F.mse_loss(model.extract_identity(output), identity)
-        recon_loss = F.l1_loss(output, batch)
+        identity = model.extract_identity(source)
+        output = model.generator(target, identity)
+
+        id_loss = 1.0 - F.cosine_similarity(
+            model.extract_identity(output), identity, dim=1
+        ).mean()
+        recon_loss = F.l1_loss(output, target)
         loss = id_weight * id_loss + recon_weight * recon_loss
 
         total_loss += loss.item()
@@ -126,10 +147,19 @@ def train(config: dict | None = None) -> Path:
         num_workers=train_cfg["num_workers"],
     )
 
-    model = FaceSwapModel(identity_dim=train_cfg["latent_dim"]).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=train_cfg["learning_rate"])
-    tracker = MetricsTracker()
+    facenet_pretrained = train_cfg.get("facenet_pretrained", "vggface2")
+    model = FaceSwapModel(facenet_pretrained=facenet_pretrained).to(device)
 
+    # Only train the generator; FaceNet identity extractor stays frozen
+    optimizer = torch.optim.Adam(
+        model.trainable_parameters(), lr=train_cfg["learning_rate"]
+    )
+    print(
+        f"Identity extractor: frozen pretrained FaceNet ({facenet_pretrained}), "
+        f"embedding dim {train_cfg['latent_dim']}"
+    )
+
+    tracker = MetricsTracker()
     best_val_loss = float("inf")
     best_path = paths.best_model_path
 
@@ -151,12 +181,16 @@ def train(config: dict | None = None) -> Path:
 
         if va_loss < best_val_loss:
             best_val_loss = va_loss
-            torch.save(model.state_dict(), best_path)
-            print(f"  Saved best model to {best_path}")
+            model.save_trainable(best_path)
+            print(f"  Saved best generator weights to {best_path}")
 
         if epoch % train_cfg["checkpoint_every"] == 0:
             torch.save(
-                {"epoch": epoch, "model": model.state_dict(), "optimizer": optimizer.state_dict()},
+                {
+                    "epoch": epoch,
+                    "generator": model.generator.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                },
                 paths.latest_checkpoint_path,
             )
 

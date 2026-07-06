@@ -81,6 +81,18 @@ git show v0.3.0     # inspect a specific step
 | POST   | `/swap`           | Trigger face swap        |
 | GET    | `/health`         | Health check             |
 
+## Third-Party vs Custom Components
+
+| Component | Source | Trained by you? |
+|-----------|--------|-----------------|
+| **Generator (U-Net)** | Custom `torch.nn` | Yes |
+| **Identity extractor** | Pretrained **FaceNet** (`facenet-pytorch`, VGGFace2) | No — frozen |
+| **Face detection** | MediaPipe / OpenCV | No |
+| **Discriminator** | Custom PatchGAN | Optional (defined, not in default loop) |
+| **Optimizer** | `torch.optim.Adam` | N/A |
+
+Only the **generator** is trained on LFW. FaceNet converts the source face into a 512-d identity vector; the generator learns to synthesize the target pose with that identity.
+
 ## License
 
 Educational project — use responsibly and ethically.
