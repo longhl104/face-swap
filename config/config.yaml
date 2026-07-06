@@ -18,8 +18,10 @@ training:
 
 # Inference settings
 inference:
+  mode: classical        # classical | neural | hybrid
   blend_ratio: 0.85
-  feather_kernel: 15
+  feather_kernel: 21
+  neural_blend: 0.15     # only used in hybrid mode
 
 # Video processing (bonus)
 video:

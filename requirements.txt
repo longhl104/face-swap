@@ -5,9 +5,6 @@ numpy>=1.24.0
 opencv-python>=4.8.0
 Pillow>=10.0.0
 
-# Face detection & alignment
-mediapipe>=0.10.0
-
 # Pretrained identity extractor (frozen at train time)
 # On Python 3.14+: pip install facenet-pytorch --no-deps
 facenet-pytorch>=2.5.0

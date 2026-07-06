@@ -8,11 +8,11 @@ import numpy as np
 from src.data.preprocess import FaceRegion
 
 
-def create_feather_mask(size: int, kernel: int = 15) -> np.ndarray:
+def create_feather_mask(height: int, width: int, kernel: int = 15) -> np.ndarray:
     """Create a soft elliptical mask for seamless blending."""
-    mask = np.zeros((size, size), dtype=np.float32)
-    center = (size // 2, size // 2)
-    axes = (size // 2 - 2, size // 2 - 2)
+    mask = np.zeros((height, width), dtype=np.float32)
+    center = (width // 2, height // 2)
+    axes = (max(1, width // 2 - 2), max(1, height // 2 - 2))
     cv2.ellipse(mask, center, axes, 0, 0, 360, 1.0, -1)
     mask = cv2.GaussianBlur(mask, (kernel, kernel), 0)
     return mask
@@ -47,9 +47,8 @@ def blend_face_into_image(
     resized_face = cv2.resize(swapped_face, (x2 - x1, y2 - y1))
 
     color_matched = match_color(resized_face, target_region)
-    mask = create_feather_mask(resized_face.shape[0], feather_kernel)
-    if mask.shape[0] != color_matched.shape[0] or mask.shape[1] != color_matched.shape[1]:
-        mask = cv2.resize(mask, (color_matched.shape[1], color_matched.shape[0]))
+    rh, rw = color_matched.shape[:2]
+    mask = create_feather_mask(rh, rw, feather_kernel)
 
     mask_3d = mask[:, :, np.newaxis] * blend_ratio
     blended = (

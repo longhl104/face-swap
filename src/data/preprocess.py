@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
-import mediapipe as mp
 import numpy as np
+
+from src.config import PROJECT_ROOT
+
+YUNET_MODEL_URL = (
+    "https://github.com/opencv/opencv_zoo/raw/main/models/"
+    "face_detection_yunet/face_detection_yunet_2023mar.onnx"
+)
+YUNET_MODEL_PATH = PROJECT_ROOT / "models" / "face_detection_yunet.onnx"
 
 
 @dataclass
@@ -18,34 +26,38 @@ class FaceRegion:
     landmarks: np.ndarray | None = None
 
 
+def _ensure_yunet_model() -> Path:
+    YUNET_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not YUNET_MODEL_PATH.exists():
+        print(f"Downloading YuNet face detector to {YUNET_MODEL_PATH}...")
+        urllib.request.urlretrieve(YUNET_MODEL_URL, YUNET_MODEL_PATH)
+    return YUNET_MODEL_PATH
+
+
 class FacePreprocessor:
-    """Detect and align faces using MediaPipe."""
+    """Detect and align faces using OpenCV YuNet."""
 
     def __init__(self, image_size: int = 128) -> None:
         self.image_size = image_size
-        self._detector = mp.solutions.face_detection.FaceDetection(
-            model_selection=1, min_detection_confidence=0.5
+        model_path = _ensure_yunet_model()
+        self._detector = cv2.FaceDetectorYN.create(
+            str(model_path), "", (320, 320), 0.6, 0.3, 5000
         )
 
     def detect_face(self, image: np.ndarray) -> FaceRegion | None:
         """Return the largest detected face in the image."""
-        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        results = self._detector.process(rgb)
-        if not results.detections:
+        h, w = image.shape[:2]
+        self._detector.setInputSize((w, h))
+        _, faces = self._detector.detect(image)
+        if faces is None or len(faces) == 0:
+            if h >= 64 and w >= 64:
+                return FaceRegion(bbox=(0, 0, w, h))
             return None
 
-        h, w = image.shape[:2]
-        best = max(
-            results.detections,
-            key=lambda d: d.location_data.relative_bounding_box.width
-            * d.location_data.relative_bounding_box.height,
-        )
-        box = best.location_data.relative_bounding_box
-        x = max(0, int(box.xmin * w))
-        y = max(0, int(box.ymin * h))
-        bw = min(int(box.width * w), w - x)
-        bh = min(int(box.height * h), h - y)
-        return FaceRegion(bbox=(x, y, bw, bh))
+        best = max(faces, key=lambda f: f[2] * f[3])
+        x, y, fw, fh = int(best[0]), int(best[1]), int(best[2]), int(best[3])
+        landmarks = best[4:14].reshape(5, 2).astype(np.float32)
+        return FaceRegion(bbox=(x, y, fw, fh), landmarks=landmarks)
 
     def crop_and_align(self, image: np.ndarray, region: FaceRegion) -> np.ndarray:
         """Crop face region, pad to square, and resize."""
@@ -70,11 +82,10 @@ class FacePreprocessor:
         region = self.detect_face(image)
         if region is None:
             return None
-        face = self.crop_and_align(image, region)
-        return face
+        return self.crop_and_align(image, region)
 
     def close(self) -> None:
-        self._detector.close()
+        pass
 
     def __enter__(self) -> FacePreprocessor:
         return self
