@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 import torch
@@ -14,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from models.face_swap_model import FaceSwapModel
 from src.config import StoragePaths, load_config
-from src.data.dataset import FaceDataset
+from src.data.dataset import FaceDataset, collate_faces
 from src.training.metrics import MetricsTracker
 
 
@@ -28,11 +29,18 @@ def _shuffled_pairs(batch: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     if batch_size < 2:
         return batch, batch
 
-    perm = torch.randperm(batch_size, device=batch.device)
-    same = perm == torch.arange(batch_size, device=batch.device)
-    while same.any():
-        perm[same] = torch.randperm(batch_size, device=batch.device)[same]
-    return batch, batch[perm]
+    device = batch.device
+    while True:
+        perm = torch.randperm(batch_size, device=device)
+        if not (perm == torch.arange(batch_size, device=device)).any():
+            return batch, batch[perm]
+
+
+def _loader_workers(requested: int) -> int:
+    """Use 0 workers on Windows to avoid DataLoader hangs."""
+    if sys.platform == "win32":
+        return 0
+    return requested
 
 
 def train_epoch(
@@ -46,17 +54,24 @@ def train_epoch(
     model.generator.train()
     total_loss = id_total = recon_total = 0.0
 
-    for batch in tqdm(loader, desc="Training", leave=False):
+    progress = tqdm(loader, desc="Training", leave=False, mininterval=1.0)
+    for step, batch in enumerate(progress, start=1):
+        batch_start = time.perf_counter()
+
+        embeddings = None
+        if isinstance(batch, (list, tuple)):
+            batch, embeddings = batch
         batch = batch.to(device)
         source, target = _shuffled_pairs(batch)
 
-        # Frozen FaceNet: source identity embedding (no grad to extractor)
-        with torch.no_grad():
-            identity = model.extract_identity(source)
+        if embeddings is not None:
+            identity = embeddings.to(device)
+        else:
+            with torch.no_grad():
+                identity = model.extract_identity(source)
 
         output = model.generator(target, identity)
 
-        # Identity loss: output should match source identity (grad flows to generator)
         id_loss = 1.0 - F.cosine_similarity(
             model.extract_identity(output), identity, dim=1
         ).mean()
@@ -70,6 +85,10 @@ def train_epoch(
         total_loss += loss.item()
         id_total += id_loss.item()
         recon_total += recon_loss.item()
+
+        if step == 1:
+            elapsed = time.perf_counter() - batch_start
+            progress.set_postfix({"batch_s": f"{elapsed:.1f}"})
 
     n = len(loader)
     return total_loss / n, id_total / n, recon_total / n
@@ -88,10 +107,13 @@ def validate(
     similarities: list[float] = []
 
     for batch in loader:
+        embeddings = None
+        if isinstance(batch, (list, tuple)):
+            batch, embeddings = batch
         batch = batch.to(device)
         source, target = _shuffled_pairs(batch)
 
-        identity = model.extract_identity(source)
+        identity = embeddings.to(device) if embeddings is not None else model.extract_identity(source)
         output = model.generator(target, identity)
 
         id_loss = 1.0 - F.cosine_similarity(
@@ -127,30 +149,32 @@ def train(config: dict | None = None) -> Path:
             "and scripts/preprocess_dataset.py first."
         )
 
+    if not dataset.use_embeddings:
+        print(
+            "No cached FaceNet embeddings found. Training will be slow on CPU.\n"
+            "Run: python scripts/precompute_embeddings.py"
+        )
+
     val_size = max(1, int(len(dataset) * train_cfg["val_split"]))
     train_size = len(dataset) - val_size
     train_ds, val_ds = random_split(
         dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42)
     )
 
-    train_loader = DataLoader(
-        train_ds,
+    workers = _loader_workers(train_cfg["num_workers"])
+    loader_kwargs = dict(
         batch_size=train_cfg["batch_size"],
-        shuffle=True,
-        num_workers=train_cfg["num_workers"],
-        drop_last=True,
+        num_workers=workers,
+        collate_fn=collate_faces,
+        pin_memory=device.type == "cuda",
     )
-    val_loader = DataLoader(
-        val_ds,
-        batch_size=train_cfg["batch_size"],
-        shuffle=False,
-        num_workers=train_cfg["num_workers"],
-    )
+
+    train_loader = DataLoader(train_ds, shuffle=True, drop_last=True, **loader_kwargs)
+    val_loader = DataLoader(val_ds, shuffle=False, **loader_kwargs)
 
     facenet_pretrained = train_cfg.get("facenet_pretrained", "vggface2")
     model = FaceSwapModel(facenet_pretrained=facenet_pretrained).to(device)
 
-    # Only train the generator; FaceNet identity extractor stays frozen
     optimizer = torch.optim.Adam(
         model.trainable_parameters(), lr=train_cfg["learning_rate"]
     )
@@ -158,6 +182,8 @@ def train(config: dict | None = None) -> Path:
         f"Identity extractor: frozen pretrained FaceNet ({facenet_pretrained}), "
         f"embedding dim {train_cfg['latent_dim']}"
     )
+    if workers != train_cfg["num_workers"]:
+        print(f"DataLoader workers: {workers} (Windows-safe default)")
 
     tracker = MetricsTracker()
     best_val_loss = float("inf")

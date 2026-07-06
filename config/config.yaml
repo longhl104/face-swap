@@ -5,7 +5,7 @@ image_size: 128
 
 # Training hyperparameters
 training:
-  batch_size: 32
+  batch_size: 8           # smaller batch is faster per-step on CPU
   epochs: 50
   learning_rate: 0.0002
   latent_dim: 512          # FaceNet embedding size (fixed)
@@ -13,7 +13,7 @@ training:
   identity_weight: 10.0
   reconstruction_weight: 2.0
   val_split: 0.1
-  num_workers: 2
+  num_workers: 0           # use 0 on Windows to avoid DataLoader hangs
   checkpoint_every: 5
 
 # Inference settings
