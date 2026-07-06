@@ -185,7 +185,11 @@ def train(config: dict | None = None) -> Path:
     if workers != train_cfg["num_workers"]:
         print(f"DataLoader workers: {workers} (Windows-safe default)")
 
-    tracker = MetricsTracker()
+    tracker = MetricsTracker(paths.training_output)
+    resumed = len(tracker.history)
+    if resumed:
+        print(f"Resumed metrics history from {resumed} prior epoch(s)")
+
     best_val_loss = float("inf")
     best_path = paths.best_model_path
 
@@ -204,6 +208,7 @@ def train(config: dict | None = None) -> Path:
             f"  Train loss: {tr_loss:.4f} | Val loss: {va_loss:.4f} "
             f"| Identity accuracy: {id_acc:.4f}"
         )
+        tracker.persist(paths.training_output)
 
         if va_loss < best_val_loss:
             best_val_loss = va_loss
@@ -220,5 +225,4 @@ def train(config: dict | None = None) -> Path:
                 paths.latest_checkpoint_path,
             )
 
-    tracker.plot(paths.training_output)
     return best_path

@@ -8,7 +8,7 @@ Replace a face in an image or video with another face while preserving natural e
 - **Dataset update/augmentation** script for adding new faces
 - **Production REST API** (FastAPI) for upload and swap operations
 - **Image & video inference** with temporal smoothing for videos
-- **Training metrics** — loss and accuracy graphs saved automatically
+- **Training metrics** — loss and accuracy graphs saved automatically after **every epoch** to `outputs/training/` (`training_metrics.json`, `training_metrics.csv`, `training_metrics.png`)
 
 ## Project Structure
 
