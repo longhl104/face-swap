@@ -1,0 +1,117 @@
+"""Video face swapping with temporal smoothing."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+from src.inference.engine import FaceSwapEngine
+
+
+class TemporalSmoother:
+    """Exponential moving average smoothing for face landmarks across frames."""
+
+    def __init__(self, alpha: float = 0.7) -> None:
+        self.alpha = alpha
+        self._prev_bbox: tuple[int, int, int, int] | None = None
+
+    def smooth(self, bbox: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        if self._prev_bbox is None:
+            self._prev_bbox = bbox
+            return bbox
+
+        smoothed = tuple(
+            int(self.alpha * prev + (1 - self.alpha) * curr)
+            for prev, curr in zip(self._prev_bbox, bbox)
+        )
+        self._prev_bbox = smoothed
+        return smoothed  # type: ignore[return-value]
+
+    def reset(self) -> None:
+        self._prev_bbox = None
+
+
+def swap_video(
+    engine: FaceSwapEngine,
+    source_path: Path,
+    target_path: Path,
+    output_path: Path,
+    max_fps: int | None = None,
+) -> Path:
+    """
+    Process a video frame-by-frame with temporal smoothing.
+
+    Ensures smooth pose and expression transitions across frames.
+    """
+    video_cfg = engine.config.get("video", {})
+    alpha = video_cfg.get("temporal_alpha", 0.7)
+    fps_limit = max_fps or video_cfg.get("max_fps", 30)
+
+    source_img = cv2.imread(str(source_path))
+    if source_img is None:
+        raise FileNotFoundError(f"Cannot read source image: {source_path}")
+
+    cap = cv2.VideoCapture(str(target_path))
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Cannot open video: {target_path}")
+
+    src_fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    out_fps = min(src_fps, fps_limit)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(output_path), fourcc, out_fps, (width, height))
+
+    smoother = TemporalSmoother(alpha=alpha)
+    frame_skip = max(1, int(src_fps / out_fps))
+    frame_idx = 0
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if frame_idx % frame_skip != 0:
+            frame_idx += 1
+            continue
+
+        # Apply temporal smoothing to face detection
+        region = engine.preprocessor.detect_face(frame)
+        if region is not None:
+            smoothed_bbox = smoother.smooth(region.bbox)
+            from src.data.preprocess import FaceRegion
+
+            region = FaceRegion(bbox=smoothed_bbox, landmarks=region.landmarks)
+
+            source_region = engine.preprocessor.detect_face(source_img)
+            if source_region is not None:
+                source_face = engine.preprocessor.crop_and_align(source_img, source_region)
+                target_face = engine.preprocessor.crop_and_align(frame, region)
+
+                source_tensor = engine._to_tensor(source_face)
+                target_tensor = engine._to_tensor(target_face)
+
+                swapped_tensor = engine.model.swap(source_tensor, target_tensor)
+                swapped_face = engine._from_tensor(swapped_tensor)
+
+                from src.inference.blending import blend_face_into_image
+
+                frame = blend_face_into_image(
+                    frame,
+                    swapped_face,
+                    region,
+                    blend_ratio=engine.blend_ratio,
+                    feather_kernel=engine.feather_kernel,
+                )
+
+        writer.write(frame)
+        frame_idx += 1
+
+    cap.release()
+    writer.release()
+    print(f"Video saved to {output_path}")
+    return output_path

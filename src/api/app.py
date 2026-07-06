@@ -90,12 +90,12 @@ async def swap(session_id: str) -> FileResponse:
     engine = get_engine()
 
     if suffix in {".mp4", ".avi", ".mov", ".mkv"}:
-        raise HTTPException(
-            status_code=501,
-            detail="Video swap not yet available. Use an image target or upgrade to v0.8.0.",
-        )
+        from src.inference.video import swap_video
 
-    result = engine.swap_from_paths(source_path, target_path)
+        output = paths.inference_output / f"{session_id}_swapped.mp4"
+        result = swap_video(engine, source_path, target_path, output)
+    else:
+        result = engine.swap_from_paths(source_path, target_path)
 
     if result is None:
         raise HTTPException(status_code=422, detail="Face detection failed on source or target.")
