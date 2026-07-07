@@ -1,4 +1,4 @@
-"""Core face swap inference engine."""
+"""Core face swap inference engine — neural generator only."""
 
 from __future__ import annotations
 
@@ -12,11 +12,10 @@ from models.face_swap_model import FaceSwapModel
 from src.config import StoragePaths, load_config
 from src.data.preprocess import FacePreprocessor
 from src.inference.blending import blend_face_into_image
-from src.inference.classical_swap import warp_and_blend
 
 
 class FaceSwapEngine:
-    """Production-ready face swap inference engine."""
+    """Production-ready neural face swap inference engine."""
 
     def __init__(self, model_path: Path | None = None, config: dict | None = None) -> None:
         self.config = config or load_config()
@@ -43,8 +42,6 @@ class FaceSwapEngine:
         self.model.eval()
         self.blend_ratio = infer_cfg["blend_ratio"]
         self.feather_kernel = infer_cfg["feather_kernel"]
-        self.mode = infer_cfg.get("mode", "classical")
-        self.neural_blend = infer_cfg.get("neural_blend", 0.15)
 
     def _to_tensor(self, face: np.ndarray) -> torch.Tensor:
         tensor = torch.from_numpy(face).permute(2, 0, 1).float() / 127.5 - 1.0
@@ -55,62 +52,23 @@ class FaceSwapEngine:
         return np.clip((face + 1.0) * 127.5, 0, 255).astype(np.uint8)
 
     @torch.no_grad()
-    def _neural_swap_face(
-        self, source_face: np.ndarray, target_face: np.ndarray
-    ) -> np.ndarray:
-        source_tensor = self._to_tensor(source_face)
-        target_tensor = self._to_tensor(target_face)
-        swapped_tensor = self.model.swap(source_tensor, target_tensor)
-        return self._from_tensor(swapped_tensor)
-
-    @torch.no_grad()
     def swap_faces(
         self, source_image: np.ndarray, target_image: np.ndarray
     ) -> np.ndarray | None:
-        """
-        Swap source identity onto the target face.
-
-        Modes (config inference.mode):
-        - classical: landmark warp + alpha blend (reliable, visible swap)
-        - neural:    trained generator only
-        - hybrid:    classical base + light neural refinement
-        """
+        """Swap source identity onto the target face using the trained generator."""
         source_region = self.preprocessor.detect_face(source_image)
         target_region = self.preprocessor.detect_face(target_image)
         if source_region is None or target_region is None:
             return None
 
-        if self.mode == "neural":
-            return self._swap_neural_only(source_image, target_image, source_region, target_region)
-
-        classical = warp_and_blend(
-            source_image, target_image, source_region, target_region
-        )
-        if classical is None or self.mode == "classical":
-            return classical
-
-        # hybrid: optional light neural blend on top of classical warp
         source_face = self.preprocessor.crop_and_align(source_image, source_region)
         target_face = self.preprocessor.crop_and_align(target_image, target_region)
-        neural_face = self._neural_swap_face(source_face, target_face)
-        return blend_face_into_image(
-            classical,
-            neural_face,
-            target_region,
-            blend_ratio=self.neural_blend,
-            feather_kernel=self.feather_kernel,
-        )
 
-    def _swap_neural_only(
-        self,
-        source_image: np.ndarray,
-        target_image: np.ndarray,
-        source_region,
-        target_region,
-    ) -> np.ndarray | None:
-        source_face = self.preprocessor.crop_and_align(source_image, source_region)
-        target_face = self.preprocessor.crop_and_align(target_image, target_region)
-        swapped_face = self._neural_swap_face(source_face, target_face)
+        source_tensor = self._to_tensor(source_face)
+        target_tensor = self._to_tensor(target_face)
+        swapped_tensor = self.model.swap(source_tensor, target_tensor)
+        swapped_face = self._from_tensor(swapped_tensor)
+
         return blend_face_into_image(
             target_image,
             swapped_face,

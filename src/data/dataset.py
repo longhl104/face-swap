@@ -34,6 +34,14 @@ class FaceDataset(Dataset):
 
     def __getitem__(self, idx: int) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         face = np.load(self.samples[idx])
+        if face.shape[0] != self.image_size or face.shape[1] != self.image_size:
+            import cv2
+
+            face = cv2.resize(
+                face,
+                (self.image_size, self.image_size),
+                interpolation=cv2.INTER_LINEAR,
+            )
         tensor = torch.from_numpy(face).permute(2, 0, 1).float() / 127.5 - 1.0
 
         if self.use_embeddings:

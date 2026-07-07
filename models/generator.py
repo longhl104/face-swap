@@ -21,6 +21,22 @@ class ResidualBlock(nn.Module):
         return x + self.block(x)
 
 
+class UpBlock(nn.Module):
+    """Bilinear upsample + conv avoids ConvTranspose2d checkerboard artifacts."""
+
+    def __init__(self, in_channels: int, out_channels: int) -> None:
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False),
+            nn.Conv2d(in_channels, out_channels, 3, 1, 1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.block(x)
+
+
 class FaceSwapGenerator(nn.Module):
     """
     U-Net style generator that takes a target face (pose/expression)
@@ -45,10 +61,10 @@ class FaceSwapGenerator(nn.Module):
             ResidualBlock(512),
         )
 
-        # Decoder: upsample first, then concatenate skip connections
-        self.up4 = nn.Sequential(nn.ConvTranspose2d(512, 256, 4, 2, 1), nn.ReLU(inplace=True))
-        self.up3 = nn.Sequential(nn.ConvTranspose2d(512, 128, 4, 2, 1), nn.ReLU(inplace=True))
-        self.up2 = nn.Sequential(nn.ConvTranspose2d(256, 64, 4, 2, 1), nn.ReLU(inplace=True))
+        # Decoder: upsample + conv (no checkerboard)
+        self.up4 = UpBlock(512, 256)
+        self.up3 = UpBlock(512, 128)
+        self.up2 = UpBlock(256, 64)
         self.dec1 = nn.Sequential(nn.Conv2d(128, 3, 7, 1, 3), nn.Tanh())
 
     def forward(self, target_face: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:

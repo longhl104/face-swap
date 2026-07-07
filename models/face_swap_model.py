@@ -42,17 +42,35 @@ class FaceSwapModel(nn.Module):
         return self.generator.parameters()
 
     def save_trainable(self, path) -> None:
-        """Save only trainable weights (generator). FaceNet stays pretrained."""
-        torch.save({"generator": self.generator.state_dict()}, path)
+        """Save generator and discriminator weights."""
+        torch.save(
+            {
+                "generator": self.generator.state_dict(),
+                "discriminator": self.discriminator.state_dict(),
+            },
+            path,
+        )
 
     def load_trainable(self, path, map_location=None) -> None:
-        """Load trainable weights, with fallback for legacy full checkpoints."""
+        """Load generator weights (and discriminator if present)."""
         checkpoint = torch.load(path, map_location=map_location, weights_only=False)
         if not isinstance(checkpoint, dict):
             raise ValueError(f"Expected dict checkpoint, got {type(checkpoint)}")
 
         if "generator" in checkpoint:
-            self.generator.load_state_dict(checkpoint["generator"])
+            state = checkpoint["generator"]
+            try:
+                self.generator.load_state_dict(state)
+            except RuntimeError:
+                result = self.generator.load_state_dict(state, strict=False)
+                missing = len(result.missing_keys)
+                if missing:
+                    print(
+                        f"Warning: {missing} generator layers not loaded — "
+                        "architecture changed. Retrain from scratch."
+                    )
+            if "discriminator" in checkpoint:
+                self.discriminator.load_state_dict(checkpoint["discriminator"], strict=False)
             return
 
         gen_state = {
@@ -61,9 +79,9 @@ class FaceSwapModel(nn.Module):
             if k.startswith("generator.")
         }
         if gen_state:
-            self.generator.load_state_dict(gen_state)
+            self.generator.load_state_dict(gen_state, strict=False)
             return
 
         raise ValueError(
-            f"No generator weights found in {path}. Retrain with the FaceNet pipeline."
+            f"No generator weights found in {path}. Run scripts/train.py first."
         )

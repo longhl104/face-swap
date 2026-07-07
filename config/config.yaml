@@ -1,31 +1,38 @@
 # Face Swap System Configuration
 
 # Image dimensions (faces are resized to square crops)
-image_size: 128
+image_size: 160
 
 # Training hyperparameters
 training:
-  batch_size: 8           # smaller batch is faster per-step on CPU
+  batch_size: 8
   epochs: 50
   learning_rate: 0.0002
   latent_dim: 512          # FaceNet embedding size (fixed)
   facenet_pretrained: vggface2
-  identity_weight: 10.0
-  reconstruction_weight: 2.0
+  identity_weight: 1.0
+  reconstruction_weight: 10.0
+  perceptual_weight: 5.0    # VGG perceptual loss for visual realism
+  adversarial_weight: 0.5   # PatchGAN discriminator
+  use_gan: true
   val_split: 0.1
-  num_workers: 0           # use 0 on Windows to avoid DataLoader hangs
+  num_workers: 0
   checkpoint_every: 5
+  # Optional speed knobs (set temporarily, then remove/zero for full training)
+  max_train_samples: 0        # e.g. 800 or 2000
+  max_val_samples: 0          # e.g. 100 or 200
+  identity_every: 1           # e.g. 4 to compute FaceNet loss every 4 steps
+  perceptual_every: 1        # e.g. 2 to compute VGG loss every 2 steps
+  adversarial_every: 1        # e.g. 2 to train discriminator every 2 steps
 
-# Inference settings
+# Inference settings (neural generator only)
 inference:
-  mode: neural        # classical | neural | hybrid
-  blend_ratio: 0.85
-  feather_kernel: 21
-  neural_blend: 0.15     # only used in hybrid mode
+  blend_ratio: 0.92
+  feather_kernel: 31
 
 # Video processing (bonus)
 video:
-  temporal_alpha: 0.7        # EMA smoothing factor (higher = smoother)
+  temporal_alpha: 0.7
   max_fps: 30
 
 # Storage paths (relative to project root)
