@@ -29,10 +29,10 @@ training:
 
 # Inference settings (neural generator only)
 inference:
-  blend_ratio: 0.95
-  feather_kernel: 21
-  face_padding: 0.12   # crop margin around detected face bbox
-  mask_scale: 1     # <1 shrinks parsing mask slightly
+  blend_ratio: 0.85
+  feather_kernel: 15
+  face_padding: 0.2   # must match training crop padding (preprocess.crop_and_align pad=0.2)
+  mask_scale: 1      # <1 shrinks parsing mask slightly
 
 # Video processing (bonus)
 video:
