@@ -42,7 +42,6 @@ class FaceSwapEngine:
         self.model.eval()
         self.blend_ratio = infer_cfg["blend_ratio"]
         self.feather_kernel = infer_cfg["feather_kernel"]
-        self.face_padding = infer_cfg.get("face_padding", 0.12)
         self.mask_scale = infer_cfg.get("mask_scale", 1.0)
 
     def _to_tensor(self, face: np.ndarray) -> torch.Tensor:
@@ -64,20 +63,19 @@ class FaceSwapEngine:
             return None
 
         source_face = self.preprocessor.crop_and_align(source_image, source_region)
-        target_face = self.preprocessor.crop_and_align(target_image, target_region)
+        target_crop = self.preprocessor.align_crop(target_image, target_region)
 
         source_tensor = self._to_tensor(source_face)
-        target_tensor = self._to_tensor(target_face)
+        target_tensor = self._to_tensor(target_crop.face)
         swapped_tensor = self.model.swap(source_tensor, target_tensor)
         swapped_face = self._from_tensor(swapped_tensor)
 
         return blend_face_into_image(
             target_image,
             swapped_face,
-            target_region,
+            target_crop,
             blend_ratio=self.blend_ratio,
             feather_kernel=self.feather_kernel,
-            face_padding=self.face_padding,
             mask_scale=self.mask_scale,
         )
 

@@ -90,10 +90,10 @@ def swap_video(
             source_region = engine.preprocessor.detect_face(source_img)
             if source_region is not None:
                 source_face = engine.preprocessor.crop_and_align(source_img, source_region)
-                target_face = engine.preprocessor.crop_and_align(frame, region)
+                target_crop = engine.preprocessor.align_crop(frame, region)
 
                 source_tensor = engine._to_tensor(source_face)
-                target_tensor = engine._to_tensor(target_face)
+                target_tensor = engine._to_tensor(target_crop.face)
 
                 swapped_tensor = engine.model.swap(source_tensor, target_tensor)
                 swapped_face = engine._from_tensor(swapped_tensor)
@@ -103,10 +103,9 @@ def swap_video(
                 frame = blend_face_into_image(
                     frame,
                     swapped_face,
-                    region,
+                    target_crop,
                     blend_ratio=engine.blend_ratio,
                     feather_kernel=engine.feather_kernel,
-                    face_padding=engine.face_padding,
                     mask_scale=engine.mask_scale,
                 )
 

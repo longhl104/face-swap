@@ -5,35 +5,8 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from src.data.preprocess import FaceRegion
+from src.data.preprocess import AlignedCrop
 from src.inference.face_mask import get_face_parser
-
-
-def _insertion_rect(
-    image_shape: tuple[int, ...],
-    region: FaceRegion,
-    face_padding: float,
-) -> tuple[int, int, int, int]:
-    """Square crop around the face bbox with minimal padding for reinsertion."""
-    x, y, w, h = region.bbox
-    pad = int(max(w, h) * face_padding)
-    x1, y1 = x - pad, y - pad
-    x2, y2 = x + w + pad, y + h + pad
-
-    side = max(x2 - x1, y2 - y1)
-    cx = (x1 + x2) // 2
-    cy = (y1 + y2) // 2
-    x1 = cx - side // 2
-    x2 = x1 + side
-    y1 = cy - side // 2
-    y2 = y1 + side
-
-    img_h, img_w = image_shape[:2]
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(img_w, x2)
-    y2 = min(img_h, y2)
-    return x1, y1, x2, y2
 
 
 def _apply_mask_scale(mask: np.ndarray, scale: float) -> np.ndarray:
@@ -82,22 +55,32 @@ def match_color(source: np.ndarray, target: np.ndarray, mask: np.ndarray) -> np.
 def blend_face_into_image(
     original: np.ndarray,
     swapped_face: np.ndarray,
-    region: FaceRegion,
+    crop: AlignedCrop,
     blend_ratio: float = 0.85,
     feather_kernel: int = 15,
-    face_padding: float = 0.05,
     mask_scale: float = 1.0,
 ) -> np.ndarray:
-    """Reinsert only the parsed face region into the original image."""
-    x1, y1, x2, y2 = _insertion_rect(original.shape, region, face_padding)
+    """Reinsert the swapped face into the exact region it was cropped from.
+
+    The swapped output is mapped back onto ``crop.crop_rect`` using the same
+    geometry ``align_crop`` produced, and the reflection padding added to make
+    the crop square is stripped off first. This keeps the face aligned and
+    avoids the mirrored-edge "ghost" (nested face) artifact.
+    """
+    x1, y1, x2, y2 = crop.crop_rect
+    top, bottom, left, right = crop.pad
+    ch, cw = y2 - y1, x2 - x1
+
+    # Undo resize back to the padded square, then drop the reflection border so
+    # only the real face content remains.
+    square = cv2.resize(
+        swapped_face, (crop.side, crop.side), interpolation=cv2.INTER_LINEAR
+    )
+    face = square[top : top + ch, left : left + cw]
 
     target_region = original[y1:y2, x1:x2]
-    resized_face = cv2.resize(
-        swapped_face, (x2 - x1, y2 - y1), interpolation=cv2.INTER_LINEAR
-    )
-
     mask = create_face_mask(target_region, feather_kernel, mask_scale)
-    color_matched = match_color(resized_face, target_region, mask)
+    color_matched = match_color(face, target_region, mask)
 
     mask_3d = mask[:, :, np.newaxis] * blend_ratio
     blended = (

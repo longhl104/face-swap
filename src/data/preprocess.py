@@ -26,6 +26,23 @@ class FaceRegion:
     landmarks: np.ndarray | None = None
 
 
+@dataclass
+class AlignedCrop:
+    """A square, resized face crop plus the geometry needed to reinsert it.
+
+    ``face`` is the network-ready square crop. ``crop_rect`` is the exact
+    (clamped) region in the original image the real face content came from,
+    and ``pad`` is the reflection padding added to make the crop square.
+    Together they let the swapped output be placed back with pixel-perfect
+    alignment and no mirrored-edge (ghost ear) artifacts.
+    """
+
+    face: np.ndarray
+    crop_rect: tuple[int, int, int, int]  # x1, y1, x2, y2 in the original image
+    pad: tuple[int, int, int, int]  # top, bottom, left, right reflection padding
+    side: int  # square side length (before resize to image_size)
+
+
 def _ensure_yunet_model() -> Path:
     YUNET_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     if not YUNET_MODEL_PATH.exists():
@@ -59,8 +76,8 @@ class FacePreprocessor:
         landmarks = best[4:14].reshape(5, 2).astype(np.float32)
         return FaceRegion(bbox=(x, y, fw, fh), landmarks=landmarks)
 
-    def crop_and_align(self, image: np.ndarray, region: FaceRegion) -> np.ndarray:
-        """Crop face region, pad to square, and resize."""
+    def align_crop(self, image: np.ndarray, region: FaceRegion) -> AlignedCrop:
+        """Crop face region, pad to square, resize, and record insertion geometry."""
         x, y, w, h = region.bbox
         pad = int(max(w, h) * 0.2)
         x1 = max(0, x - pad)
@@ -86,7 +103,19 @@ class FacePreprocessor:
             right,
             borderType=cv2.BORDER_REFLECT_101,
         )
-        return cv2.resize(square, (self.image_size, self.image_size), interpolation=cv2.INTER_LINEAR)
+        face = cv2.resize(
+            square, (self.image_size, self.image_size), interpolation=cv2.INTER_LINEAR
+        )
+        return AlignedCrop(
+            face=face,
+            crop_rect=(x1, y1, x2, y2),
+            pad=(top, bottom, left, right),
+            side=side,
+        )
+
+    def crop_and_align(self, image: np.ndarray, region: FaceRegion) -> np.ndarray:
+        """Crop face region, pad to square, and resize (network-ready face only)."""
+        return self.align_crop(image, region).face
 
     def process_image(self, image: np.ndarray) -> np.ndarray | None:
         """Detect, crop, align, and return a normalized face tensor."""
