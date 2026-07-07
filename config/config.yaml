@@ -10,10 +10,10 @@ training:
   learning_rate: 0.0002
   latent_dim: 512          # FaceNet embedding size (fixed)
   facenet_pretrained: vggface2
-  identity_weight: 1.0
-  reconstruction_weight: 10.0
-  perceptual_weight: 5.0    # VGG perceptual loss for visual realism
-  adversarial_weight: 0.5   # PatchGAN discriminator
+  identity_weight: 10
+  reconstruction_weight: 1.0
+  perceptual_weight: 1.0    # VGG perceptual loss for visual realism
+  adversarial_weight: 0.1   # PatchGAN discriminator
   use_gan: true
   val_split: 0.1
   num_workers: 0

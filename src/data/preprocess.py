@@ -71,11 +71,22 @@ class FacePreprocessor:
         crop = image[y1:y2, x1:x2]
         ch, cw = crop.shape[:2]
         side = max(ch, cw)
-        square = np.zeros((side, side, 3), dtype=np.uint8)
-        dy = (side - ch) // 2
-        dx = (side - cw) // 2
-        square[dy : dy + ch, dx : dx + cw] = crop
-        return cv2.resize(square, (self.image_size, self.image_size))
+
+        # Pad to square without introducing black borders (black borders become
+        # visible as "rounded black blobs" after blending).
+        top = (side - ch) // 2
+        bottom = side - ch - top
+        left = (side - cw) // 2
+        right = side - cw - left
+        square = cv2.copyMakeBorder(
+            crop,
+            top,
+            bottom,
+            left,
+            right,
+            borderType=cv2.BORDER_REFLECT_101,
+        )
+        return cv2.resize(square, (self.image_size, self.image_size), interpolation=cv2.INTER_LINEAR)
 
     def process_image(self, image: np.ndarray) -> np.ndarray | None:
         """Detect, crop, align, and return a normalized face tensor."""
