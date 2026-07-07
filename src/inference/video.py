@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import cv2
-import numpy as np
 
 from src.inference.engine import FaceSwapEngine
 
@@ -28,9 +27,6 @@ class TemporalSmoother:
         )
         self._prev_bbox = smoothed
         return smoothed  # type: ignore[return-value]
-
-    def reset(self) -> None:
-        self._prev_bbox = None
 
 
 def swap_video(

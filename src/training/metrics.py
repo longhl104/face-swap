@@ -124,7 +124,7 @@ class MetricsTracker:
         out.mkdir(parents=True, exist_ok=True)
         epochs = [m.epoch for m in self.history]
 
-        fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+        _, axes = plt.subplots(1, 3, figsize=(15, 4))
 
         axes[0].plot(epochs, [m.train_loss for m in self.history], label="Train")
         axes[0].plot(epochs, [m.val_loss for m in self.history], label="Val")

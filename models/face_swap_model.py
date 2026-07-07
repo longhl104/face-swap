@@ -37,10 +37,6 @@ class FaceSwapModel(nn.Module):
     ) -> torch.Tensor:
         return self.swap(source_face, target_face)
 
-    def trainable_parameters(self):
-        """Parameters updated during training (generator only)."""
-        return self.generator.parameters()
-
     def save_trainable(self, path) -> None:
         """Save generator and discriminator weights."""
         torch.save(

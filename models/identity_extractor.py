@@ -24,10 +24,6 @@ class FaceNetIdentityExtractor(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
 
-    @property
-    def embedding_dim(self) -> int:
-        return FACENET_EMBEDDING_DIM
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Input: BCHW in [-1, 1] at project image_size (e.g. 128x128)
         x = F.interpolate(x, size=(160, 160), mode="bilinear", align_corners=False)

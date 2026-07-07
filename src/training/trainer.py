@@ -332,7 +332,7 @@ def train(config: dict | None = None) -> Path:
             id_w, recon_w, chroma_w, perc_w, adv_w, use_gan,
             identity_every, perceptual_every, adversarial_every, grad_clip,
         )
-        va_loss, va_id, va_recon, va_chroma, va_perc, id_acc = validate(
+        va_loss, va_id, va_recon, va_chroma, _, id_acc = validate(
             model, val_loader, perceptual, chroma, device, id_w, recon_w, chroma_w, perc_w,
         )
         tracker.record(epoch, tr_loss, va_loss, tr_id, va_id, tr_recon, va_recon, id_acc)
