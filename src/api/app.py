@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from src.config import StoragePaths, load_config
+from src.data.update import add_faces_to_dataset
 from src.inference.engine import FaceSwapEngine
 
 app = FastAPI(
@@ -101,3 +103,43 @@ async def swap(session_id: str) -> FileResponse:
         raise HTTPException(status_code=422, detail="Face detection failed on source or target.")
 
     return FileResponse(str(result), media_type="application/octet-stream", filename=result.name)
+
+
+@app.post("/dataset/add")
+async def dataset_add(
+    files: list[UploadFile] = File(...),
+    augment: bool = Form(True),
+) -> dict[str, object]:
+    """Add new face images to the training dataset (update/augmentation method).
+
+    Uploaded images are copied into raw storage, optionally augmented
+    (horizontal flip + brightness jitter), detected/aligned, and cached as
+    preprocessed tensors so the next training run includes them.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="Upload at least one image file.")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        received = 0
+        for upload in files:
+            suffix = Path(upload.filename or "file.jpg").suffix or ".jpg"
+            dest = tmp_dir / f"{uuid.uuid4().hex}{suffix}"
+            with open(dest, "wb") as f:
+                shutil.copyfileobj(upload.file, f)
+            received += 1
+
+        added = add_faces_to_dataset(
+            tmp_dir,
+            augment=augment,
+            image_size=config["image_size"],
+            show_progress=False,
+        )
+
+    if added == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="No faces could be detected in the uploaded images.",
+        )
+
+    return {"files_received": received, "samples_added": added, "augmented": augment}

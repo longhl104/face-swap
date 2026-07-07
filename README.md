@@ -42,13 +42,10 @@ pip install -r requirements.txt
 python scripts/download_dataset.py
 python scripts/preprocess_dataset.py
 
-# 4. Precompute FaceNet embeddings (speeds up training on CPU)
-python scripts/precompute_embeddings.py
-
-# 5. Train the model
+# 4. Train the model
 python scripts/train.py
 
-# 6. Run inference (CLI)
+# 5. Run inference (CLI)
 python scripts/inference.py --source path/to/source.jpg --target path/to/target.jpg
 
 # 6. Start the API server

@@ -78,17 +78,11 @@ def train_epoch(
     for step, batch in enumerate(progress, start=1):
         batch_start = time.perf_counter()
 
-        embeddings = None
-        if isinstance(batch, (list, tuple)):
-            batch, embeddings = batch
         batch = batch.to(device)
         source, target = _shuffled_pairs(batch)
 
-        if embeddings is not None:
-            identity = embeddings.to(device)
-        else:
-            with torch.no_grad():
-                identity = model.extract_identity(source)
+        with torch.no_grad():
+            identity = model.extract_identity(source)
 
         # --- Train discriminator (optional / throttled) ---
         train_disc_this_step = (
@@ -195,13 +189,10 @@ def validate(
     similarities: list[float] = []
 
     for batch in loader:
-        embeddings = None
-        if isinstance(batch, (list, tuple)):
-            batch, embeddings = batch
         batch = batch.to(device)
         source, target = _shuffled_pairs(batch)
 
-        identity = embeddings.to(device) if embeddings is not None else model.extract_identity(source)
+        identity = model.extract_identity(source)
         output = model.generator(target, identity)
 
         id_loss = 1.0 - F.cosine_similarity(
@@ -244,12 +235,6 @@ def train(config: dict | None = None) -> Path:
         raise RuntimeError(
             "No preprocessed data found. Run scripts/download_dataset.py "
             "and scripts/preprocess_dataset.py first."
-        )
-
-    if not dataset.use_embeddings:
-        print(
-            "No cached FaceNet embeddings found. Training will be slow on CPU.\n"
-            "Run: python scripts/precompute_embeddings.py"
         )
 
     val_size = max(1, int(len(dataset) * train_cfg["val_split"]))
