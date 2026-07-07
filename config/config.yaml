@@ -1,7 +1,7 @@
 # Face Swap System Configuration
 
 # Image dimensions (faces are resized to square crops)
-image_size: 160
+image_size: 256
 
 # Training hyperparameters
 training:
@@ -10,10 +10,12 @@ training:
   learning_rate: 0.0002
   latent_dim: 512          # FaceNet embedding size (fixed)
   facenet_pretrained: vggface2
-  identity_weight: 10
-  reconstruction_weight: 1.0
+  identity_weight: 10.0     # primary objective — preserve source identity
+  reconstruction_weight: 2.0
+  chroma_weight: 4.0        # Lab a/b match — target skin tone, not luminance
   perceptual_weight: 1.0    # VGG perceptual loss for visual realism
   adversarial_weight: 0.1   # PatchGAN discriminator
+  grad_clip: 1.0             # prevent NaN from gradient explosion
   use_gan: true
   val_split: 0.1
   num_workers: 0
@@ -27,8 +29,10 @@ training:
 
 # Inference settings (neural generator only)
 inference:
-  blend_ratio: 0.92
-  feather_kernel: 31
+  blend_ratio: 0.95
+  feather_kernel: 21
+  face_padding: 0.12   # crop margin around detected face bbox
+  mask_scale: 1     # <1 shrinks parsing mask slightly
 
 # Video processing (bonus)
 video:

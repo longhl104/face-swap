@@ -23,3 +23,4 @@ tqdm>=4.65.0
 
 # Utilities
 pyyaml>=6.0
+onnxruntime>=1.16.0

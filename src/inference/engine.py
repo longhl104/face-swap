@@ -42,6 +42,8 @@ class FaceSwapEngine:
         self.model.eval()
         self.blend_ratio = infer_cfg["blend_ratio"]
         self.feather_kernel = infer_cfg["feather_kernel"]
+        self.face_padding = infer_cfg.get("face_padding", 0.12)
+        self.mask_scale = infer_cfg.get("mask_scale", 1.0)
 
     def _to_tensor(self, face: np.ndarray) -> torch.Tensor:
         tensor = torch.from_numpy(face).permute(2, 0, 1).float() / 127.5 - 1.0
@@ -75,6 +77,8 @@ class FaceSwapEngine:
             target_region,
             blend_ratio=self.blend_ratio,
             feather_kernel=self.feather_kernel,
+            face_padding=self.face_padding,
+            mask_scale=self.mask_scale,
         )
 
     def swap_from_paths(

@@ -6,26 +6,77 @@ import cv2
 import numpy as np
 
 from src.data.preprocess import FaceRegion
+from src.inference.face_mask import get_face_parser
 
 
-def create_feather_mask(height: int, width: int, kernel: int = 15) -> np.ndarray:
-    """Create a soft elliptical mask for seamless blending."""
-    mask = np.zeros((height, width), dtype=np.float32)
-    center = (width // 2, height // 2)
-    axes = (max(1, width // 2 - 2), max(1, height // 2 - 2))
-    cv2.ellipse(mask, center, axes, 0, 0, 360, 1.0, -1)
-    mask = cv2.GaussianBlur(mask, (kernel, kernel), 0)
-    return mask
+def _insertion_rect(
+    image_shape: tuple[int, ...],
+    region: FaceRegion,
+    face_padding: float,
+) -> tuple[int, int, int, int]:
+    """Square crop around the face bbox with minimal padding for reinsertion."""
+    x, y, w, h = region.bbox
+    pad = int(max(w, h) * face_padding)
+    x1, y1 = x - pad, y - pad
+    x2, y2 = x + w + pad, y + h + pad
+
+    side = max(x2 - x1, y2 - y1)
+    cx = (x1 + x2) // 2
+    cy = (y1 + y2) // 2
+    x1 = cx - side // 2
+    x2 = x1 + side
+    y1 = cy - side // 2
+    y2 = y1 + side
+
+    img_h, img_w = image_shape[:2]
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(img_w, x2)
+    y2 = min(img_h, y2)
+    return x1, y1, x2, y2
 
 
-def match_color(source: np.ndarray, target: np.ndarray) -> np.ndarray:
-    """Adjust source color statistics to match target region."""
-    result = source.astype(np.float32)
-    for c in range(3):
-        src_mean, src_std = source[:, :, c].mean(), source[:, :, c].std() + 1e-6
-        tgt_mean, tgt_std = target[:, :, c].mean(), target[:, :, c].std() + 1e-6
-        result[:, :, c] = (result[:, :, c] - src_mean) * (tgt_std / src_std) + tgt_mean
-    return np.clip(result, 0, 255).astype(np.uint8)
+def _apply_mask_scale(mask: np.ndarray, scale: float) -> np.ndarray:
+    """Shrink mask toward its center. scale=1.0 unchanged, 0.88 ≈ 12% smaller."""
+    if scale >= 0.999:
+        return mask
+    h, w = mask.shape
+    erosion = max(1, int(min(h, w) * (1.0 - scale) * 0.4))
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE, (erosion * 2 + 1, erosion * 2 + 1)
+    )
+    return cv2.erode(mask, kernel, iterations=1)
+
+
+def create_face_mask(
+    target_region: np.ndarray,
+    feather_kernel: int = 15,
+    mask_scale: float = 1.0,
+) -> np.ndarray:
+    """Build a face mask using the face-parsing ONNX model."""
+    mask = get_face_parser().face_mask(target_region, feather_kernel)
+    return _apply_mask_scale(mask, mask_scale)
+
+
+def match_color(source: np.ndarray, target: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Match target skin chroma (Lab a/b) inside the face mask only."""
+    src_lab = cv2.cvtColor(source, cv2.COLOR_BGR2LAB).astype(np.float32)
+    tgt_lab = cv2.cvtColor(target, cv2.COLOR_BGR2LAB).astype(np.float32)
+
+    m = (mask > 0.1).astype(np.float32)
+    if m.sum() < 1:
+        m = np.ones_like(mask)
+
+    out = src_lab.copy()
+    for c in (1, 2):
+        src_vals = src_lab[:, :, c][m > 0]
+        tgt_vals = tgt_lab[:, :, c][m > 0]
+        src_mean, src_std = src_vals.mean(), src_vals.std() + 1e-6
+        tgt_mean, tgt_std = tgt_vals.mean(), tgt_vals.std() + 1e-6
+        out[:, :, c] = (out[:, :, c] - src_mean) * (tgt_std / src_std) + tgt_mean
+
+    out = np.clip(out, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(out, cv2.COLOR_LAB2BGR)
 
 
 def blend_face_into_image(
@@ -34,46 +85,19 @@ def blend_face_into_image(
     region: FaceRegion,
     blend_ratio: float = 0.85,
     feather_kernel: int = 15,
+    face_padding: float = 0.05,
+    mask_scale: float = 1.0,
 ) -> np.ndarray:
-    """Reinsert the swapped face back into the original image with feathering."""
-    x, y, w, h = region.bbox
-    pad = int(max(w, h) * 0.2)
-    x1 = x - pad
-    y1 = y - pad
-    x2 = x + w + pad
-    y2 = y + h + pad
-
-    # Make reinsertion region square to avoid horizontally squashing the
-    # square generator output when resizing back into a rectangular bbox.
-    rw = x2 - x1
-    rh = y2 - y1
-    side = max(rw, rh)
-    cx = (x1 + x2) // 2
-    cy = (y1 + y2) // 2
-    x1 = cx - side // 2
-    x2 = x1 + side
-    y1 = cy - side // 2
-    y2 = y1 + side
-
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(original.shape[1], x2)
-    y2 = min(original.shape[0], y2)
+    """Reinsert only the parsed face region into the original image."""
+    x1, y1, x2, y2 = _insertion_rect(original.shape, region, face_padding)
 
     target_region = original[y1:y2, x1:x2]
     resized_face = cv2.resize(
         swapped_face, (x2 - x1, y2 - y1), interpolation=cv2.INTER_LINEAR
     )
 
-    color_matched = match_color(resized_face, target_region)
-    rh, rw = color_matched.shape[:2]
-    mask = create_feather_mask(rh, rw, feather_kernel)
-
-    # Safety: if the swapped face has near-black pixels (from padding),
-    # downweight them so they don't show as side blobs.
-    dark = (color_matched.mean(axis=2) < 8).astype(np.float32)
-    if dark.mean() > 0.001:
-        mask = mask * (1.0 - 0.95 * dark)
+    mask = create_face_mask(target_region, feather_kernel, mask_scale)
+    color_matched = match_color(resized_face, target_region, mask)
 
     mask_3d = mask[:, :, np.newaxis] * blend_ratio
     blended = (

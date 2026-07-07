@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import time
 from pathlib import Path
+import math
 
 import torch
 import torch.nn.functional as F
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from models.face_swap_model import FaceSwapModel
 from src.config import StoragePaths, load_config
 from src.data.dataset import FaceDataset, collate_faces
+from src.training.chroma import ChromaLoss
 from src.training.metrics import MetricsTracker
 from src.training.perceptual import PerceptualLoss
 
@@ -49,21 +51,24 @@ def train_epoch(
     gen_optimizer: torch.optim.Optimizer,
     disc_optimizer: torch.optim.Optimizer | None,
     perceptual: PerceptualLoss,
+    chroma: ChromaLoss,
     device: torch.device,
     id_weight: float,
     recon_weight: float,
+    chroma_weight: float,
     perceptual_weight: float,
     adv_weight: float,
     use_gan: bool,
     identity_every: int,
     perceptual_every: int,
     adversarial_every: int,
-) -> tuple[float, float, float, float, float]:
+    grad_clip: float,
+) -> tuple[float, float, float, float, float, float]:
     model.generator.train()
     if use_gan:
         model.discriminator.train()
 
-    total_loss = id_total = recon_total = perc_total = adv_total = 0.0
+    total_loss = id_total = recon_total = chroma_total = perc_total = adv_total = 0.0
 
     progress = tqdm(loader, desc="Training", leave=False, mininterval=1.0)
     identity_every = max(1, int(identity_every))
@@ -103,6 +108,10 @@ def train_epoch(
             )
             disc_optimizer.zero_grad()
             disc_loss.backward()
+            if grad_clip > 0:
+                torch.nn.utils.clip_grad_norm_(
+                    model.discriminator.parameters(), grad_clip
+                )
             disc_optimizer.step()
 
         # --- Train generator ---
@@ -117,6 +126,9 @@ def train_epoch(
         else:
             id_loss = output.new_tensor(0.0)
         recon_loss = F.l1_loss(output, target)
+        chroma_loss = (
+            chroma(output, target) if chroma_weight > 0.0 else output.new_tensor(0.0)
+        )
         # Heavy: VGG forward. Throttle in speed mode.
         compute_perc = perceptual_weight > 0.0 and (step % perceptual_every == 0)
         perc_loss = perceptual(output, target) if compute_perc else output.new_tensor(0.0)
@@ -124,6 +136,7 @@ def train_epoch(
         gen_loss = (
             id_weight * id_loss
             + recon_weight * recon_loss
+            + chroma_weight * chroma_loss
             + perceptual_weight * perc_loss
         )
 
@@ -131,17 +144,23 @@ def train_epoch(
             disc_out = model.discriminator(output)
             adv_loss = -disc_out.mean()
             gen_loss = gen_loss + adv_weight * adv_loss
-            adv_total += adv_loss.item()
-        else:
-            adv_loss = torch.tensor(0.0)
+            if torch.isfinite(adv_loss):
+                adv_total += adv_loss.item()
+
+        if not torch.isfinite(gen_loss):
+            print(f"  Warning: non-finite loss at step {step}, skipping batch.")
+            continue
 
         gen_optimizer.zero_grad()
         gen_loss.backward()
+        if grad_clip > 0:
+            torch.nn.utils.clip_grad_norm_(model.generator.parameters(), grad_clip)
         gen_optimizer.step()
 
         total_loss += gen_loss.item()
         id_total += id_loss.item()
         recon_total += recon_loss.item()
+        chroma_total += chroma_loss.item()
         perc_total += perc_loss.item()
 
         if step == 1:
@@ -153,6 +172,7 @@ def train_epoch(
         total_loss / n,
         id_total / n,
         recon_total / n,
+        chroma_total / n,
         perc_total / n,
         adv_total / n if use_gan else 0.0,
     )
@@ -163,13 +183,15 @@ def validate(
     model: FaceSwapModel,
     loader: DataLoader,
     perceptual: PerceptualLoss,
+    chroma: ChromaLoss,
     device: torch.device,
     id_weight: float,
     recon_weight: float,
+    chroma_weight: float,
     perceptual_weight: float,
-) -> tuple[float, float, float, float, float]:
+) -> tuple[float, float, float, float, float, float]:
     model.generator.eval()
-    total_loss = id_total = recon_total = perc_total = 0.0
+    total_loss = id_total = recon_total = chroma_total = perc_total = 0.0
     similarities: list[float] = []
 
     for batch in loader:
@@ -186,18 +208,25 @@ def validate(
             model.extract_identity(output), identity, dim=1
         ).mean()
         recon_loss = F.l1_loss(output, target)
+        chroma_loss = chroma(output, target)
         perc_loss = perceptual(output, target)
-        loss = id_weight * id_loss + recon_weight * recon_loss + perceptual_weight * perc_loss
+        loss = (
+            id_weight * id_loss
+            + recon_weight * recon_loss
+            + chroma_weight * chroma_loss
+            + perceptual_weight * perc_loss
+        )
 
         total_loss += loss.item()
         id_total += id_loss.item()
         recon_total += recon_loss.item()
+        chroma_total += chroma_loss.item()
         perc_total += perc_loss.item()
         similarities.append(cosine_similarity(model.extract_identity(output), identity))
 
     n = len(loader)
     avg_sim = sum(similarities) / len(similarities) if similarities else 0.0
-    return total_loss / n, id_total / n, recon_total / n, perc_total / n, avg_sim
+    return total_loss / n, id_total / n, recon_total / n, chroma_total / n, perc_total / n, avg_sim
 
 
 def train(config: dict | None = None) -> Path:
@@ -254,6 +283,7 @@ def train(config: dict | None = None) -> Path:
     facenet_pretrained = train_cfg.get("facenet_pretrained", "vggface2")
     model = FaceSwapModel(facenet_pretrained=facenet_pretrained).to(device)
     perceptual = PerceptualLoss().to(device)
+    chroma = ChromaLoss().to(device)
 
     use_gan = train_cfg.get("use_gan", True)
     gen_optimizer = torch.optim.Adam(
@@ -287,32 +317,35 @@ def train(config: dict | None = None) -> Path:
 
     id_w = train_cfg["identity_weight"]
     recon_w = train_cfg["reconstruction_weight"]
+    chroma_w = train_cfg.get("chroma_weight", 4.0)
     perc_w = train_cfg.get("perceptual_weight", 1.0)
     adv_w = train_cfg.get("adversarial_weight", 0.5)
     identity_every = int(train_cfg.get("identity_every", 1) or 1)
     perceptual_every = int(train_cfg.get("perceptual_every", 1) or 1)
     adversarial_every = int(train_cfg.get("adversarial_every", 1) or 1)
+    grad_clip = float(train_cfg.get("grad_clip", 1.0))
 
     for epoch in range(1, train_cfg["epochs"] + 1):
         print(f"\nEpoch {epoch}/{train_cfg['epochs']}")
-        tr_loss, tr_id, tr_recon, tr_perc, tr_adv = train_epoch(
-            model, train_loader, gen_optimizer, disc_optimizer, perceptual, device,
-            id_w, recon_w, perc_w, adv_w, use_gan,
-            identity_every, perceptual_every, adversarial_every,
+        tr_loss, tr_id, tr_recon, tr_chroma, tr_perc, tr_adv = train_epoch(
+            model, train_loader, gen_optimizer, disc_optimizer, perceptual, chroma, device,
+            id_w, recon_w, chroma_w, perc_w, adv_w, use_gan,
+            identity_every, perceptual_every, adversarial_every, grad_clip,
         )
-        va_loss, va_id, va_recon, va_perc, id_acc = validate(
-            model, val_loader, perceptual, device, id_w, recon_w, perc_w,
+        va_loss, va_id, va_recon, va_chroma, va_perc, id_acc = validate(
+            model, val_loader, perceptual, chroma, device, id_w, recon_w, chroma_w, perc_w,
         )
         tracker.record(epoch, tr_loss, va_loss, tr_id, va_id, tr_recon, va_recon, id_acc)
         print(
             f"  Train loss: {tr_loss:.4f} | Val loss: {va_loss:.4f} "
             f"| Identity accuracy: {id_acc:.4f}"
         )
+        print(f"  Chroma: {tr_chroma:.4f} (val {va_chroma:.4f})")
         if use_gan:
             print(f"  Perceptual: {tr_perc:.4f} | Adversarial: {tr_adv:.4f}")
         tracker.persist(paths.training_output)
 
-        if va_loss < best_val_loss:
+        if va_loss < best_val_loss and math.isfinite(va_loss):
             best_val_loss = va_loss
             model.save_trainable(best_path)
             print(f"  Saved best generator weights to {best_path}")

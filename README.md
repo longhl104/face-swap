@@ -91,6 +91,7 @@ git show v0.3.0     # inspect a specific step
 | **Generator (U-Net)** | Custom `torch.nn` | Yes |
 | **Identity extractor** | Pretrained **FaceNet** (`facenet-pytorch`, VGGFace2) | No — frozen |
 | **Face detection** | OpenCV YuNet | No |
+| **Face mask (inference)** | BiSeNet face parsing ONNX (CelebAMask-HQ) | No — frozen |
 | **Discriminator** | Custom PatchGAN | Yes (adversarial training) |
 | **Optimizer** | `torch.optim.Adam` | N/A |
 

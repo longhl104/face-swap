@@ -106,6 +106,8 @@ def swap_video(
                     region,
                     blend_ratio=engine.blend_ratio,
                     feather_kernel=engine.feather_kernel,
+                    face_padding=engine.face_padding,
+                    mask_scale=engine.mask_scale,
                 )
 
         writer.write(frame)
