@@ -297,8 +297,42 @@ def train(config: dict | None = None) -> Path:
     if resumed:
         print(f"Resumed metrics history from {resumed} prior epoch(s)")
 
-    best_val_loss = float("inf")
     best_path = paths.best_model_path
+
+    # Seed the best-loss threshold from prior history so a fresh/early epoch
+    # can't overwrite an already-good best_model.pt.
+    best_val_loss = float("inf")
+    finite_val_losses = [m.val_loss for m in tracker.history if math.isfinite(m.val_loss)]
+    if finite_val_losses:
+        best_val_loss = min(finite_val_losses)
+
+    # Resume model + optimizer state so reruns continue training instead of
+    # restarting from random weights.
+    start_epoch = 0
+    resume_enabled = bool(train_cfg.get("resume", True))
+    ckpt_path = paths.latest_checkpoint_path
+    if resume_enabled and ckpt_path.exists():
+        checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
+        model.generator.load_state_dict(checkpoint["generator"])
+        if "gen_optimizer" in checkpoint:
+            gen_optimizer.load_state_dict(checkpoint["gen_optimizer"])
+        if use_gan and disc_optimizer is not None:
+            if "discriminator" in checkpoint:
+                model.discriminator.load_state_dict(checkpoint["discriminator"])
+            if "disc_optimizer" in checkpoint:
+                disc_optimizer.load_state_dict(checkpoint["disc_optimizer"])
+        start_epoch = int(checkpoint.get("epoch", 0))
+        print(
+            f"Resumed model + optimizer from {ckpt_path.name} "
+            f"(completed epoch {start_epoch}, best val loss {best_val_loss:.4f})"
+        )
+    elif resume_enabled and best_path.exists():
+        model.load_trainable(best_path, map_location=device)
+        start_epoch = max((m.epoch for m in tracker.history), default=0)
+        print(
+            f"Resumed generator weights from {best_path.name} "
+            f"(no optimizer state; best val loss {best_val_loss:.4f})"
+        )
 
     id_w = train_cfg["identity_weight"]
     recon_w = train_cfg["reconstruction_weight"]
@@ -310,8 +344,16 @@ def train(config: dict | None = None) -> Path:
     adversarial_every = int(train_cfg.get("adversarial_every", 1) or 1)
     grad_clip = float(train_cfg.get("grad_clip", 1.0))
 
-    for epoch in range(1, train_cfg["epochs"] + 1):
-        print(f"\nEpoch {epoch}/{train_cfg['epochs']}")
+    total_epochs = train_cfg["epochs"]
+    if start_epoch >= total_epochs:
+        print(
+            f"Requested {total_epochs} epochs but {start_epoch} already completed; "
+            "nothing to train. Increase training.epochs to continue."
+        )
+        return best_path
+
+    for epoch in range(start_epoch + 1, total_epochs + 1):
+        print(f"\nEpoch {epoch}/{total_epochs}")
         tr_loss, tr_id, tr_recon, tr_chroma, tr_perc, tr_adv = train_epoch(
             model, train_loader, gen_optimizer, disc_optimizer, perceptual, chroma, device,
             id_w, recon_w, chroma_w, perc_w, adv_w, use_gan,
