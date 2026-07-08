@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from facenet_pytorch import InceptionResnetV1, fixed_image_standardization
+from facenet_pytorch import InceptionResnetV1
 
 FACENET_EMBEDDING_DIM = 512
 
@@ -30,8 +30,7 @@ class FaceNetIdentityExtractor(nn.Module):
             mode="bilinear",
             align_corners=False)
 
-        x = (x + 1) / 127.5  # maps [-1, 1] -> [0, 255]
-        x = fixed_image_standardization(x)
-
-        embeddings = self.model(x)  # (B, 512)
-        return F.normalize(embeddings, p=2, dim=1)
+        x = (x + 1.0) * 127.5
+        x = (x - 127.5) / 128.0
+        embedding = self.model(x)
+        return F.normalize(embedding, p=2, dim=1)
