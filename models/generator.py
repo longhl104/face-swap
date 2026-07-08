@@ -1,5 +1,3 @@
-"""Generative face swap model (encoder-decoder with identity conditioning)."""
-
 from __future__ import annotations
 
 import torch
@@ -22,8 +20,6 @@ class ResidualBlock(nn.Module):
 
 
 class UpBlock(nn.Module):
-    """Bilinear upsample + conv avoids ConvTranspose2d checkerboard artifacts."""
-
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
         self.block = nn.Sequential(
@@ -46,10 +42,14 @@ class FaceSwapGenerator(nn.Module):
     def __init__(self, identity_dim: int = 512) -> None:
         super().__init__()
         # Encoder
-        self.enc1 = nn.Sequential(nn.Conv2d(3, 64, 7, 1, 3), nn.ReLU(inplace=True))
-        self.enc2 = nn.Sequential(nn.Conv2d(64, 128, 4, 2, 1), nn.ReLU(inplace=True))
-        self.enc3 = nn.Sequential(nn.Conv2d(128, 256, 4, 2, 1), nn.ReLU(inplace=True))
-        self.enc4 = nn.Sequential(nn.Conv2d(256, 512, 4, 2, 1), nn.ReLU(inplace=True))
+        self.enc1 = nn.Sequential(
+            nn.Conv2d(3, 64, 7, 1, 3), nn.ReLU(inplace=True))
+        self.enc2 = nn.Sequential(
+            nn.Conv2d(64, 128, 4, 2, 1), nn.ReLU(inplace=True))
+        self.enc3 = nn.Sequential(
+            nn.Conv2d(128, 256, 4, 2, 1), nn.ReLU(inplace=True))
+        self.enc4 = nn.Sequential(
+            nn.Conv2d(256, 512, 4, 2, 1), nn.ReLU(inplace=True))
 
         # Identity conditioning
         self.identity_proj = nn.Linear(identity_dim, 512)
@@ -61,7 +61,7 @@ class FaceSwapGenerator(nn.Module):
             ResidualBlock(512),
         )
 
-        # Decoder: upsample + conv (no checkerboard)
+        # Decoder: upsample + conv
         self.up4 = UpBlock(512, 256)
         self.up3 = UpBlock(512, 128)
         self.up2 = UpBlock(256, 64)
