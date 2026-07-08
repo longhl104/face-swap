@@ -1,6 +1,12 @@
 """Training loop for the face swap model."""
 
 from __future__ import annotations
+from src.training.perceptual import PerceptualLoss
+from src.training.metrics import MetricsTracker
+from src.training.chroma import ChromaLoss
+from src.data.dataset import FaceDataset, collate_faces
+from src.config import StoragePaths, load_config
+from models.face_swap_model import FaceSwapModel
 
 import sys
 import time
@@ -13,13 +19,6 @@ from torch.utils.data import DataLoader, Subset, random_split
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
-from models.face_swap_model import FaceSwapModel
-from src.config import StoragePaths, load_config
-from src.data.dataset import FaceDataset, collate_faces
-from src.training.chroma import ChromaLoss
-from src.training.metrics import MetricsTracker
-from src.training.perceptual import PerceptualLoss
 
 
 def cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> float:
@@ -39,12 +38,6 @@ def _shuffled_pairs(batch: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
             return batch, batch[perm]
 
 
-def _loader_workers(requested: int) -> int:
-    if sys.platform == "win32":
-        return 0
-    return requested
-
-
 def train_epoch(
     model: FaceSwapModel,
     loader: DataLoader,
@@ -58,15 +51,13 @@ def train_epoch(
     chroma_weight: float,
     perceptual_weight: float,
     adv_weight: float,
-    use_gan: bool,
     identity_every: int,
     perceptual_every: int,
     adversarial_every: int,
     grad_clip: float,
 ) -> tuple[float, float, float, float, float, float]:
     model.generator.train()
-    if use_gan:
-        model.discriminator.train()
+    model.discriminator.train()
 
     total_loss = id_total = recon_total = chroma_total = perc_total = adv_total = 0.0
 
@@ -86,8 +77,7 @@ def train_epoch(
 
         # --- Train discriminator (optional / throttled) ---
         train_disc_this_step = (
-            use_gan
-            and disc_optimizer is not None
+            disc_optimizer is not None
             and (step % adversarial_every == 0)
             and adv_weight > 0.0
         )
@@ -124,8 +114,10 @@ def train_epoch(
             chroma(output, target) if chroma_weight > 0.0 else output.new_tensor(0.0)
         )
         # Heavy: VGG forward. Throttle in speed mode.
-        compute_perc = perceptual_weight > 0.0 and (step % perceptual_every == 0)
-        perc_loss = perceptual(output, target) if compute_perc else output.new_tensor(0.0)
+        compute_perc = perceptual_weight > 0.0 and (
+            step % perceptual_every == 0)
+        perc_loss = perceptual(
+            output, target) if compute_perc else output.new_tensor(0.0)
 
         gen_loss = (
             id_weight * id_loss
@@ -134,7 +126,7 @@ def train_epoch(
             + perceptual_weight * perc_loss
         )
 
-        if use_gan and adv_weight > 0.0:
+        if adv_weight > 0.0:
             disc_out = model.discriminator(output)
             adv_loss = -disc_out.mean()
             gen_loss = gen_loss + adv_weight * adv_loss
@@ -142,13 +134,15 @@ def train_epoch(
                 adv_total += adv_loss.item()
 
         if not torch.isfinite(gen_loss):
-            print(f"  Warning: non-finite loss at step {step}, skipping batch.")
+            print(
+                f"  Warning: non-finite loss at step {step}, skipping batch.")
             continue
 
         gen_optimizer.zero_grad()
         gen_loss.backward()
         if grad_clip > 0:
-            torch.nn.utils.clip_grad_norm_(model.generator.parameters(), grad_clip)
+            torch.nn.utils.clip_grad_norm_(
+                model.generator.parameters(), grad_clip)
         gen_optimizer.step()
 
         total_loss += gen_loss.item()
@@ -168,7 +162,7 @@ def train_epoch(
         recon_total / n,
         chroma_total / n,
         perc_total / n,
-        adv_total / n if use_gan else 0.0,
+        adv_total / n,
     )
 
 
@@ -213,7 +207,8 @@ def validate(
         recon_total += recon_loss.item()
         chroma_total += chroma_loss.item()
         perc_total += perc_loss.item()
-        similarities.append(cosine_similarity(model.extract_identity(output), identity))
+        similarities.append(cosine_similarity(
+            model.extract_identity(output), identity))
 
     n = len(loader)
     avg_sim = sum(similarities) / len(similarities) if similarities else 0.0
@@ -240,37 +235,25 @@ def train(config: dict | None = None) -> Path:
     val_size = max(1, int(len(dataset) * train_cfg["val_split"]))
     train_size = len(dataset) - val_size
     train_ds, val_ds = random_split(
-        dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42)
+        dataset, [train_size,
+                  val_size], generator=torch.Generator().manual_seed(42)
     )
 
-    # Optional: speed up by training on a small subset.
-    # (Useful to validate direction quickly; set back to None/0 for full run.)
-    max_train_samples = int(train_cfg.get("max_train_samples", 0) or 0)
-    max_val_samples = int(train_cfg.get("max_val_samples", 0) or 0)
-    if max_train_samples > 0 and len(train_ds) > max_train_samples:
-        train_ds = Subset(train_ds, list(range(max_train_samples)))
-        print(f"Speed mode: using {max_train_samples} train samples")
-    if max_val_samples > 0 and len(val_ds) > max_val_samples:
-        val_ds = Subset(val_ds, list(range(max_val_samples)))
-        print(f"Speed mode: using {max_val_samples} val samples")
+    loader_kwargs = {
+        "batch_size": train_cfg["batch_size"],
+        "num_workers": 0,
+        "collate_fn": collate_faces,
+        "pin_memory": device.type == "cuda",
+    }
 
-    workers = _loader_workers(train_cfg["num_workers"])
-    loader_kwargs = dict(
-        batch_size=train_cfg["batch_size"],
-        num_workers=workers,
-        collate_fn=collate_faces,
-        pin_memory=device.type == "cuda",
-    )
-
-    train_loader = DataLoader(train_ds, shuffle=True, drop_last=True, **loader_kwargs)
+    train_loader = DataLoader(train_ds, shuffle=True,
+                              drop_last=True, **loader_kwargs)
     val_loader = DataLoader(val_ds, shuffle=False, **loader_kwargs)
 
-    facenet_pretrained = train_cfg.get("facenet_pretrained", "vggface2")
-    model = FaceSwapModel(facenet_pretrained=facenet_pretrained).to(device)
+    model = FaceSwapModel().to(device)
     perceptual = PerceptualLoss().to(device)
     chroma = ChromaLoss().to(device)
 
-    use_gan = train_cfg.get("use_gan", True)
     gen_optimizer = torch.optim.Adam(
         model.generator.parameters(), lr=train_cfg["learning_rate"], betas=(0.5, 0.999)
     )
@@ -280,17 +263,7 @@ def train(config: dict | None = None) -> Path:
             lr=train_cfg["learning_rate"],
             betas=(0.5, 0.999),
         )
-        if use_gan
-        else None
     )
-
-    print(
-        f"Identity extractor: frozen pretrained FaceNet ({facenet_pretrained}), "
-        f"embedding dim {train_cfg['latent_dim']}"
-    )
-    print(f"Generator: U-Net with perceptual loss" + (" + PatchGAN" if use_gan else ""))
-    if workers != train_cfg["num_workers"]:
-        print(f"DataLoader workers: {workers} (Windows-safe default)")
 
     tracker = MetricsTracker(paths.training_output)
     resumed = len(tracker.history)
@@ -302,7 +275,8 @@ def train(config: dict | None = None) -> Path:
     # Seed the best-loss threshold from prior history so a fresh/early epoch
     # can't overwrite an already-good best_model.pt.
     best_val_loss = float("inf")
-    finite_val_losses = [m.val_loss for m in tracker.history if math.isfinite(m.val_loss)]
+    finite_val_losses = [
+        m.val_loss for m in tracker.history if math.isfinite(m.val_loss)]
     if finite_val_losses:
         best_val_loss = min(finite_val_losses)
 
@@ -312,13 +286,15 @@ def train(config: dict | None = None) -> Path:
     resume_enabled = bool(train_cfg.get("resume", True))
     ckpt_path = paths.latest_checkpoint_path
     if resume_enabled and ckpt_path.exists():
-        checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
+        checkpoint = torch.load(
+            ckpt_path, map_location=device, weights_only=False)
         model.generator.load_state_dict(checkpoint["generator"])
         if "gen_optimizer" in checkpoint:
             gen_optimizer.load_state_dict(checkpoint["gen_optimizer"])
-        if use_gan and disc_optimizer is not None:
+        if disc_optimizer is not None:
             if "discriminator" in checkpoint:
-                model.discriminator.load_state_dict(checkpoint["discriminator"])
+                model.discriminator.load_state_dict(
+                    checkpoint["discriminator"])
             if "disc_optimizer" in checkpoint:
                 disc_optimizer.load_state_dict(checkpoint["disc_optimizer"])
         start_epoch = int(checkpoint.get("epoch", 0))
@@ -356,20 +332,27 @@ def train(config: dict | None = None) -> Path:
         print(f"\nEpoch {epoch}/{total_epochs}")
         tr_loss, tr_id, tr_recon, tr_chroma, tr_perc, tr_adv = train_epoch(
             model, train_loader, gen_optimizer, disc_optimizer, perceptual, chroma, device,
-            id_w, recon_w, chroma_w, perc_w, adv_w, use_gan,
+            id_w, recon_w, chroma_w, perc_w, adv_w,
             identity_every, perceptual_every, adversarial_every, grad_clip,
         )
         va_loss, va_id, va_recon, va_chroma, _, id_acc = validate(
             model, val_loader, perceptual, chroma, device, id_w, recon_w, chroma_w, perc_w,
         )
-        tracker.record(epoch, tr_loss, va_loss, tr_id, va_id, tr_recon, va_recon, id_acc)
+        tracker.record(
+            epoch,
+            tr_loss,
+            va_loss,
+            tr_id,
+            va_id,
+            tr_recon,
+            va_recon,
+            id_acc)
         print(
             f"  Train loss: {tr_loss:.4f} | Val loss: {va_loss:.4f} "
             f"| Identity accuracy: {id_acc:.4f}"
         )
         print(f"  Chroma: {tr_chroma:.4f} (val {va_chroma:.4f})")
-        if use_gan:
-            print(f"  Perceptual: {tr_perc:.4f} | Adversarial: {tr_adv:.4f}")
+        print(f"  Perceptual: {tr_perc:.4f} | Adversarial: {tr_adv:.4f}")
         tracker.persist(paths.training_output)
 
         if va_loss < best_val_loss and math.isfinite(va_loss):
@@ -383,7 +366,7 @@ def train(config: dict | None = None) -> Path:
                 "generator": model.generator.state_dict(),
                 "gen_optimizer": gen_optimizer.state_dict(),
             }
-            if use_gan and disc_optimizer is not None:
+            if disc_optimizer is not None:
                 ckpt["discriminator"] = model.discriminator.state_dict()
                 ckpt["disc_optimizer"] = disc_optimizer.state_dict()
             torch.save(ckpt, paths.latest_checkpoint_path)

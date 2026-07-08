@@ -8,19 +8,12 @@ training:
   batch_size: 8
   epochs: 50
   learning_rate: 0.0002
-  latent_dim: 512          # FaceNet embedding size (fixed)
-  facenet_pretrained: vggface2
   identity_weight: 10.0     # primary objective — preserve source identity
   reconstruction_weight: 2.0
   adversarial_weight: 0.1   # PatchGAN discriminator
   grad_clip: 1.0             # prevent NaN from gradient explosion
-  use_gan: true
   val_split: 0.1
-  num_workers: 0
   checkpoint_every: 5
-  # Optional speed knobs (set temporarily, then remove/zero for full training)
-  max_train_samples: 0        # e.g. 800 or 2000
-  max_val_samples: 0          # e.g. 100 or 200
   identity_every: 1           # e.g. 4 to compute FaceNet loss every 4 steps
   adversarial_every: 1        # e.g. 2 to train discriminator every 2 steps
 

@@ -12,9 +12,9 @@ from models.identity_extractor import FACENET_EMBEDDING_DIM, FaceNetIdentityExtr
 class FaceSwapModel(nn.Module):
     """End-to-end face swap model for training and inference."""
 
-    def __init__(self, identity_dim: int | None = None, facenet_pretrained: str = "vggface2") -> None:
+    def __init__(self, identity_dim: int | None = None) -> None:
         super().__init__()
-        self.identity_extractor = FaceNetIdentityExtractor(pretrained=facenet_pretrained)
+        self.identity_extractor = FaceNetIdentityExtractor()
         embed_dim = identity_dim or FACENET_EMBEDDING_DIM
         if embed_dim != FACENET_EMBEDDING_DIM:
             raise ValueError(

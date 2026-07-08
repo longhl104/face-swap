@@ -22,22 +22,21 @@ class FaceSwapEngine:
         self.paths = StoragePaths(self.config)
         self.paths.ensure_dirs()
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
         self.image_size = self.config["image_size"]
         infer_cfg = self.config["inference"]
 
         self.preprocessor = FacePreprocessor(image_size=self.image_size)
-        train_cfg = self.config["training"]
-        self.model = FaceSwapModel(
-            facenet_pretrained=train_cfg.get("facenet_pretrained", "vggface2"),
-        ).to(self.device)
+        self.model = FaceSwapModel().to(self.device)
 
         weights = model_path or self.paths.best_model_path
         if weights.exists():
             self.model.load_trainable(weights, map_location=self.device)
             print(f"Loaded generator weights from {weights}")
         else:
-            print(f"Warning: No weights found at {weights}. Using untrained model.")
+            print(
+                f"Warning: No weights found at {weights}. Using untrained model.")
 
         self.model.eval()
         self.blend_ratio = infer_cfg["blend_ratio"]
@@ -62,7 +61,8 @@ class FaceSwapEngine:
         if source_region is None or target_region is None:
             return None
 
-        source_face = self.preprocessor.crop_and_align(source_image, source_region)
+        source_face = self.preprocessor.crop_and_align(
+            source_image, source_region)
         target_crop = self.preprocessor.align_crop(target_image, target_region)
 
         source_tensor = self._to_tensor(source_face)
@@ -92,7 +92,8 @@ class FaceSwapEngine:
         if result is None:
             return None
 
-        out = output_path or self.paths.inference_output / f"swap_{target_path.stem}.jpg"
+        out = output_path or self.paths.inference_output / \
+            f"swap_{target_path.stem}.jpg"
         out.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(out), result)
         return out

@@ -9,3 +9,4 @@ torch==2.13.0+cu132
 torchvision==0.28.0+cu132
 tqdm==4.68.4
 uvicorn==0.51.0
+opencv-python==5.0.0.93
