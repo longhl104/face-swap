@@ -1,26 +1,11 @@
-# Core ML
-torch>=2.0.0
-torchvision>=0.15.0
-numpy>=1.24.0
-opencv-python>=4.8.0
-Pillow>=10.0.0
-
-# Pretrained identity extractor (frozen at train time)
-# On Python 3.14+: pip install facenet-pytorch --no-deps
-facenet-pytorch>=2.5.0
-
-# Dataset
-kagglehub>=0.2.0
-
-# API
-fastapi>=0.100.0
-uvicorn[standard]>=0.23.0
-python-multipart>=0.0.6
-
-# Metrics & plotting
-matplotlib>=3.7.0
-tqdm>=4.65.0
-
-# Utilities
-pyyaml>=6.0
-onnxruntime>=1.16.0
+facenet_pytorch==2.6.0
+fastapi==0.139.0
+kagglehub==1.0.2
+matplotlib==3.11.0
+numpy==2.5.1
+onnxruntime==1.27.0
+PyYAML==6.0.3
+torch==2.13.0+cu132
+torchvision==0.28.0+cu132
+tqdm==4.68.4
+uvicorn==0.51.0

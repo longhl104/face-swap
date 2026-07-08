@@ -12,8 +12,6 @@ training:
   facenet_pretrained: vggface2
   identity_weight: 10.0     # primary objective — preserve source identity
   reconstruction_weight: 2.0
-  chroma_weight: 4.0        # Lab a/b match — target skin tone, not luminance
-  perceptual_weight: 1.0    # VGG perceptual loss for visual realism
   adversarial_weight: 0.1   # PatchGAN discriminator
   grad_clip: 1.0             # prevent NaN from gradient explosion
   use_gan: true
@@ -24,7 +22,6 @@ training:
   max_train_samples: 0        # e.g. 800 or 2000
   max_val_samples: 0          # e.g. 100 or 200
   identity_every: 1           # e.g. 4 to compute FaceNet loss every 4 steps
-  perceptual_every: 1        # e.g. 2 to compute VGG loss every 2 steps
   adversarial_every: 1        # e.g. 2 to train discriminator every 2 steps
 
 # Inference settings (neural generator only)
