@@ -1,5 +1,3 @@
-"""Combined face swap model wrapping identity extractor and generator."""
-
 from __future__ import annotations
 
 import torch
@@ -10,17 +8,10 @@ from models.identity_extractor import FACENET_EMBEDDING_DIM, FaceNetIdentityExtr
 
 
 class FaceSwapModel(nn.Module):
-    """End-to-end face swap model for training and inference."""
-
-    def __init__(self, identity_dim: int | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self.identity_extractor = FaceNetIdentityExtractor()
-        embed_dim = identity_dim or FACENET_EMBEDDING_DIM
-        if embed_dim != FACENET_EMBEDDING_DIM:
-            raise ValueError(
-                f"FaceNet embedding dim is {FACENET_EMBEDDING_DIM}; got {embed_dim}"
-            )
-        self.generator = FaceSwapGenerator(identity_dim=embed_dim)
+        self.generator = FaceSwapGenerator(identity_dim=FACENET_EMBEDDING_DIM)
         self.discriminator = Discriminator()
 
     def extract_identity(self, source_face: torch.Tensor) -> torch.Tensor:
@@ -38,7 +29,6 @@ class FaceSwapModel(nn.Module):
         return self.swap(source_face, target_face)
 
     def save_trainable(self, path) -> None:
-        """Save generator and discriminator weights."""
         torch.save(
             {
                 "generator": self.generator.state_dict(),
@@ -48,10 +38,13 @@ class FaceSwapModel(nn.Module):
         )
 
     def load_trainable(self, path, map_location=None) -> None:
-        """Load generator weights (and discriminator if present)."""
-        checkpoint = torch.load(path, map_location=map_location, weights_only=False)
+        checkpoint = torch.load(
+            path,
+            map_location=map_location,
+            weights_only=False)
         if not isinstance(checkpoint, dict):
-            raise ValueError(f"Expected dict checkpoint, got {type(checkpoint)}")
+            raise ValueError(
+                f"Expected dict checkpoint, got {type(checkpoint)}")
 
         if "generator" in checkpoint:
             state = checkpoint["generator"]
@@ -66,7 +59,8 @@ class FaceSwapModel(nn.Module):
                         "architecture changed. Retrain from scratch."
                     )
             if "discriminator" in checkpoint:
-                self.discriminator.load_state_dict(checkpoint["discriminator"], strict=False)
+                self.discriminator.load_state_dict(
+                    checkpoint["discriminator"], strict=False)
             return
 
         gen_state = {
