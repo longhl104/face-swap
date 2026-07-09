@@ -62,7 +62,10 @@ class FaceSwapEngine:
         swapped_tensor = self.model.swap(source_tensor, target_tensor)
         swapped_face = self._from_tensor(swapped_tensor)
 
-        return blend_face_into_image(target_image, swapped_face, target_crop)
+        feather = bool(self.config.get("inference", {}).get("feather_blend", True))
+        return blend_face_into_image(
+            target_image, swapped_face, target_crop, feather=feather
+        )
 
     def swap_from_paths(
         self, source_path: Path, target_path: Path, output_path: Path | None = None

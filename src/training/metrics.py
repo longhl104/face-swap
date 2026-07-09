@@ -8,8 +8,6 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-
 METRICS_JSON = "training_metrics.json"
 METRICS_CSV = "training_metrics.csv"
 METRICS_PLOT = "training_metrics.png"
@@ -115,6 +113,12 @@ class MetricsTracker:
     def plot(self, output_dir: Path | None = None) -> Path | None:
         """Generate and save loss and accuracy graphs."""
         if not self.history:
+            return None
+
+        try:
+            import matplotlib.pyplot as plt
+        except Exception as e:
+            print(f"  Skipping plot generation (matplotlib unavailable: {e})")
             return None
 
         out = output_dir or self.output_dir

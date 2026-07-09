@@ -140,8 +140,9 @@ def swap_video(
 
                 from src.inference.blending import blend_face_into_image
 
+                feather = bool(engine.config.get("inference", {}).get("feather_blend", True))
                 frame = blend_face_into_image(
-                    frame, swapped_face, target_crop
+                    frame, swapped_face, target_crop, feather=feather
                 )
 
         writer.write(frame)
