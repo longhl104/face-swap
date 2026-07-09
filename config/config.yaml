@@ -9,19 +9,13 @@ training:
   epochs: 50
   learning_rate: 0.0002
   identity_weight: 10.0     # primary objective — preserve source identity
-  reconstruction_weight: 2.0
+  reconstruction_weight: 10.0
   adversarial_weight: 0.1   # PatchGAN discriminator
   grad_clip: 1.0             # prevent NaN from gradient explosion
   val_split: 0.1
   checkpoint_every: 5
-  identity_every: 1           # e.g. 4 to compute FaceNet loss every 4 steps
-  adversarial_every: 1        # e.g. 2 to train discriminator every 2 steps
-
-# Inference settings (neural generator only)
-inference:
-  blend_ratio: 0.85
-  feather_kernel: 15
-  mask_scale: 1      # <1 shrinks parsing mask slightly
+  chroma_weight: 0
+  perceptual_weight: 0
 
 # Video processing (bonus)
 video:

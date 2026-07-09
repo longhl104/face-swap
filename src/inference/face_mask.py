@@ -10,21 +10,10 @@ import numpy as np
 
 from src.config import PROJECT_ROOT
 
-PARSING_MODEL_URL = (
-    "https://github.com/yakhyo/face-parsing/releases/download/weights/resnet18.onnx"
-)
 PARSING_MODEL_PATH = PROJECT_ROOT / "models" / "face_parsing_resnet18.onnx"
 
 # CelebAMask-HQ classes to include in swap mask (skin + facial features, no hair/neck/bg)
 FACE_PARSE_CLASSES = frozenset(range(1, 14))
-
-
-def _ensure_parsing_model() -> str:
-    PARSING_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    if not PARSING_MODEL_PATH.exists():
-        print(f"Downloading face parsing model to {PARSING_MODEL_PATH}...")
-        urllib.request.urlretrieve(PARSING_MODEL_URL, PARSING_MODEL_PATH)
-    return str(PARSING_MODEL_PATH)
 
 
 class FaceParsingMaskGenerator:
@@ -33,7 +22,7 @@ class FaceParsingMaskGenerator:
     def __init__(self) -> None:
         import onnxruntime as ort
 
-        model_path = _ensure_parsing_model()
+        model_path = str(PARSING_MODEL_PATH)
         providers = (
             ["CUDAExecutionProvider", "CPUExecutionProvider"]
             if ort.get_device() == "GPU"
@@ -64,7 +53,7 @@ class FaceParsingMaskGenerator:
         outputs = self.session.run(
             self.output_names, {self.input_name: self._preprocess(image_bgr)}
         )
-        return self._postprocess(outputs[0], (w, h))
+        return self._postprocess(outputs[0], (w, h))  # type: ignore
 
     def face_mask(
         self, image_bgr: np.ndarray, feather_kernel: int = 15
@@ -76,7 +65,8 @@ class FaceParsingMaskGenerator:
         if mask.sum() < 1:
             raise RuntimeError("Face parsing produced an empty mask")
 
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE,
+                                np.ones((7, 7), np.uint8))
         k = feather_kernel if feather_kernel % 2 == 1 else feather_kernel + 1
         return cv2.GaussianBlur(mask, (k, k), 0)
 

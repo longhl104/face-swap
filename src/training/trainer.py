@@ -51,9 +51,6 @@ def train_epoch(
     chroma_weight: float,
     perceptual_weight: float,
     adv_weight: float,
-    identity_every: int,
-    perceptual_every: int,
-    adversarial_every: int,
     grad_clip: float,
 ) -> tuple[float, float, float, float, float, float]:
     model.generator.train()
@@ -62,9 +59,6 @@ def train_epoch(
     total_loss = id_total = recon_total = chroma_total = perc_total = adv_total = 0.0
 
     progress = tqdm(loader, desc="Training", leave=False, mininterval=1.0)
-    identity_every = max(1, int(identity_every))
-    perceptual_every = max(1, int(perceptual_every))
-    adversarial_every = max(1, int(adversarial_every))
 
     for step, batch in enumerate(progress, start=1):
         batch_start = time.perf_counter()
@@ -78,7 +72,6 @@ def train_epoch(
         # --- Train discriminator (optional / throttled) ---
         train_disc_this_step = (
             disc_optimizer is not None
-            and (step % adversarial_every == 0)
             and adv_weight > 0.0
         )
         if train_disc_this_step:
@@ -102,7 +95,7 @@ def train_epoch(
         output = model.generator(target, identity)
 
         # Heavy: FaceNet forward on generated output. Throttle in speed mode.
-        compute_id = id_weight > 0.0 and (step % identity_every == 0)
+        compute_id = id_weight > 0.0
         if compute_id:
             id_loss = 1.0 - F.cosine_similarity(
                 model.extract_identity(output), identity, dim=1
@@ -114,8 +107,7 @@ def train_epoch(
             chroma(output, target) if chroma_weight > 0.0 else output.new_tensor(0.0)
         )
         # Heavy: VGG forward. Throttle in speed mode.
-        compute_perc = perceptual_weight > 0.0 and (
-            step % perceptual_every == 0)
+        compute_perc = perceptual_weight > 0.0
         perc_loss = perceptual(
             output, target) if compute_perc else output.new_tensor(0.0)
 
@@ -312,13 +304,10 @@ def train(config: dict | None = None) -> Path:
 
     id_w = train_cfg["identity_weight"]
     recon_w = train_cfg["reconstruction_weight"]
-    chroma_w = train_cfg.get("chroma_weight", 4.0)
-    perc_w = train_cfg.get("perceptual_weight", 1.0)
-    adv_w = train_cfg.get("adversarial_weight", 0.5)
-    identity_every = int(train_cfg.get("identity_every", 1) or 1)
-    perceptual_every = int(train_cfg.get("perceptual_every", 1) or 1)
-    adversarial_every = int(train_cfg.get("adversarial_every", 1) or 1)
-    grad_clip = float(train_cfg.get("grad_clip", 1.0))
+    chroma_w = train_cfg["chroma_weight"]
+    perc_w = train_cfg["perceptual_weight"]
+    adv_w = train_cfg["adversarial_weight"]
+    grad_clip = float(train_cfg["grad_clip"])
 
     total_epochs = train_cfg["epochs"]
     if start_epoch >= total_epochs:
@@ -331,9 +320,19 @@ def train(config: dict | None = None) -> Path:
     for epoch in range(start_epoch + 1, total_epochs + 1):
         print(f"\nEpoch {epoch}/{total_epochs}")
         tr_loss, tr_id, tr_recon, tr_chroma, tr_perc, tr_adv = train_epoch(
-            model, train_loader, gen_optimizer, disc_optimizer, perceptual, chroma, device,
-            id_w, recon_w, chroma_w, perc_w, adv_w,
-            identity_every, perceptual_every, adversarial_every, grad_clip,
+            model,
+            train_loader,
+            gen_optimizer,
+            disc_optimizer,
+            perceptual,
+            chroma,
+            device,
+            id_w,
+            recon_w,
+            chroma_w,
+            perc_w,
+            adv_w,
+            grad_clip,
         )
         va_loss, va_id, va_recon, va_chroma, _, id_acc = validate(
             model, val_loader, perceptual, chroma, device, id_w, recon_w, chroma_w, perc_w,

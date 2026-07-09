@@ -12,7 +12,7 @@ class PerceptualLoss(nn.Module):
 
     def __init__(self) -> None:
         super().__init__()
-        vgg = vgg19(weights=VGG19_Weights.DEFAULT).features[:16].eval()
+        vgg = vgg19(weights=VGG19_Weights.DEFAULT).features[:16].eval() # type: ignore
         for param in vgg.parameters():
             param.requires_grad = False
         self.features = vgg
@@ -26,7 +26,7 @@ class PerceptualLoss(nn.Module):
     def _normalize(self, x: torch.Tensor) -> torch.Tensor:
         # Input in [-1, 1] -> ImageNet normalized
         x = (x + 1.0) / 2.0
-        return (x - self.mean) / self.std
+        return (x - self.mean) / self.std # type: ignore
 
     def forward(self, output: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         out_feat = self.features(self._normalize(output))

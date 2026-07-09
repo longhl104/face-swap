@@ -2,11 +2,45 @@
 
 from __future__ import annotations
 
+import subprocess
+import tempfile
 from pathlib import Path
 
 import cv2
 
 from src.inference.engine import FaceSwapEngine
+
+
+def _ffmpeg_exe() -> str:
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+def _mux_audio(source_video: Path, silent_video: Path, output_video: Path) -> bool:
+    """Copy audio from *source_video* onto the processed silent video."""
+    cmd = [
+        _ffmpeg_exe(),
+        "-y",
+        "-i",
+        str(silent_video),
+        "-i",
+        str(source_video),
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0?",
+        "-shortest",
+        str(output_video),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Audio mux failed: {result.stderr.strip()}")
+        return False
+    return True
 
 
 class TemporalSmoother:
@@ -25,7 +59,8 @@ class TemporalSmoother:
             int(self.alpha * prev + (1 - self.alpha) * curr)
             for prev, curr in zip(self._prev_bbox, bbox)
         )
-        self._prev_bbox = smoothed
+
+        self._prev_bbox = smoothed  # pyright: ignore[reportAttributeAccessIssue] # nopep8
         return smoothed  # type: ignore[return-value]
 
 
@@ -59,8 +94,15 @@ def swap_video(
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(str(output_path), fourcc, out_fps, (width, height))
+    fourcc = cv2.VideoWriter.fourcc(*"mp4v")
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".mp4", dir=output_path.parent, delete=False
+    ) as tmp:
+        silent_path = Path(tmp.name)
+
+    writer = cv2.VideoWriter(str(silent_path), fourcc,
+                             out_fps, (width, height))
 
     smoother = TemporalSmoother(alpha=alpha)
     frame_skip = max(1, int(src_fps / out_fps))
@@ -85,24 +127,21 @@ def swap_video(
 
             source_region = engine.preprocessor.detect_face(source_img)
             if source_region is not None:
-                source_face = engine.preprocessor.crop_and_align(source_img, source_region)
+                source_face = engine.preprocessor.crop_and_align(
+                    source_img, source_region)
                 target_crop = engine.preprocessor.align_crop(frame, region)
 
                 source_tensor = engine._to_tensor(source_face)
                 target_tensor = engine._to_tensor(target_crop.face)
 
-                swapped_tensor = engine.model.swap(source_tensor, target_tensor)
+                swapped_tensor = engine.model.swap(
+                    source_tensor, target_tensor)
                 swapped_face = engine._from_tensor(swapped_tensor)
 
                 from src.inference.blending import blend_face_into_image
 
                 frame = blend_face_into_image(
-                    frame,
-                    swapped_face,
-                    target_crop,
-                    blend_ratio=engine.blend_ratio,
-                    feather_kernel=engine.feather_kernel,
-                    mask_scale=engine.mask_scale,
+                    frame, swapped_face, target_crop
                 )
 
         writer.write(frame)
@@ -110,5 +149,12 @@ def swap_video(
 
     cap.release()
     writer.release()
-    print(f"Video saved to {output_path}")
+
+    if not _mux_audio(target_path, silent_path, output_path):
+        silent_path.replace(output_path)
+        print(f"Video saved without audio to {output_path}")
+    else:
+        silent_path.unlink(missing_ok=True)
+        print(f"Video saved to {output_path}")
+
     return output_path

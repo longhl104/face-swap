@@ -21,7 +21,6 @@ class FaceSwapEngine:
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         self.image_size = self.config["image_size"]
-        infer_cfg = self.config["inference"]
 
         self.preprocessor = FacePreprocessor(image_size=self.image_size)
         self.model = FaceSwapModel().to(self.device)
@@ -35,9 +34,6 @@ class FaceSwapEngine:
                 f"Warning: No weights found at {weights}. Using untrained model.")
 
         self.model.eval()
-        self.blend_ratio = infer_cfg["blend_ratio"]
-        self.feather_kernel = infer_cfg["feather_kernel"]
-        self.mask_scale = infer_cfg.get("mask_scale", 1.0)
 
     def _to_tensor(self, face: np.ndarray) -> torch.Tensor:
         tensor = torch.from_numpy(face).permute(2, 0, 1).float() / 127.5 - 1.0
@@ -66,14 +62,7 @@ class FaceSwapEngine:
         swapped_tensor = self.model.swap(source_tensor, target_tensor)
         swapped_face = self._from_tensor(swapped_tensor)
 
-        return blend_face_into_image(
-            target_image,
-            swapped_face,
-            target_crop,
-            blend_ratio=self.blend_ratio,
-            feather_kernel=self.feather_kernel,
-            mask_scale=self.mask_scale,
-        )
+        return blend_face_into_image(target_image, swapped_face, target_crop)
 
     def swap_from_paths(
         self, source_path: Path, target_path: Path, output_path: Path | None = None
