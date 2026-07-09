@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse  # pyright: ignore[reportAttributeAccessIssue] # nopep8
 
 from src.config import StoragePaths, load_config
 from src.data.update import add_faces_to_dataset
@@ -32,7 +32,7 @@ _engine: FaceSwapEngine | None = None
 def get_engine() -> FaceSwapEngine:
     global _engine
     if _engine is None:
-        _engine = FaceSwapEngine(config=config)
+        _engine = FaceSwapEngine()
     return _engine
 
 
@@ -56,7 +56,6 @@ async def upload_source(
     file: UploadFile = File(...),
     session_id: str | None = None,
 ) -> dict[str, str]:
-    """Upload the source face image (identity to transfer)."""
     sid = session_id or uuid.uuid4().hex
     saved = _save_upload(file, "source")
     _sessions.setdefault(sid, {})["source"] = saved
@@ -68,7 +67,6 @@ async def upload_target(
     file: UploadFile = File(...),
     session_id: str | None = None,
 ) -> dict[str, str]:
-    """Upload the target image or video (face to replace)."""
     sid = session_id or uuid.uuid4().hex
     saved = _save_upload(file, "target")
     _sessions.setdefault(sid, {})["target"] = saved
@@ -100,7 +98,8 @@ async def swap(session_id: str) -> FileResponse:
         result = engine.swap_from_paths(source_path, target_path)
 
     if result is None:
-        raise HTTPException(status_code=422, detail="Face detection failed on source or target.")
+        raise HTTPException(
+            status_code=422, detail="Face detection failed on source or target.")
 
     return FileResponse(str(result), media_type="application/octet-stream", filename=result.name)
 
@@ -110,14 +109,11 @@ async def dataset_add(
     files: list[UploadFile] = File(...),
     augment: bool = Form(True),
 ) -> dict[str, object]:
-    """Add new face images to the training dataset (update/augmentation method).
-
-    Uploaded images are copied into raw storage, optionally augmented
-    (horizontal flip + brightness jitter), detected/aligned, and cached as
-    preprocessed tensors so the next training run includes them.
+    """Add new face images to the training dataset.
     """
     if not files:
-        raise HTTPException(status_code=400, detail="Upload at least one image file.")
+        raise HTTPException(
+            status_code=400, detail="Upload at least one image file.")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
@@ -132,7 +128,6 @@ async def dataset_add(
         added = add_faces_to_dataset(
             tmp_dir,
             augment=augment,
-            image_size=config["image_size"],
             show_progress=False,
         )
 

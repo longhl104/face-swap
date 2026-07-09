@@ -9,7 +9,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from src.config import PROJECT_ROOT
+from src.config import PROJECT_ROOT, load_config
 
 YUNET_MODEL_URL = (
     "https://github.com/opencv/opencv_zoo/raw/main/models/"
@@ -38,8 +38,10 @@ class AlignedCrop:
     """
 
     face: np.ndarray
-    crop_rect: tuple[int, int, int, int]  # x1, y1, x2, y2 in the original image
-    pad: tuple[int, int, int, int]  # top, bottom, left, right reflection padding
+    # x1, y1, x2, y2 in the original image
+    crop_rect: tuple[int, int, int, int]
+    # top, bottom, left, right reflection padding
+    pad: tuple[int, int, int, int]
     side: int  # square side length (before resize to image_size)
 
 
@@ -54,8 +56,8 @@ def _ensure_yunet_model() -> Path:
 class FacePreprocessor:
     """Detect and align faces using OpenCV YuNet."""
 
-    def __init__(self, image_size: int = 128) -> None:
-        self.image_size = image_size
+    def __init__(self) -> None:
+        self.image_size = load_config()["image_size"]
         model_path = _ensure_yunet_model()
         self._detector = cv2.FaceDetectorYN.create(
             str(model_path), "", (320, 320), 0.6, 0.3, 5000
@@ -104,7 +106,8 @@ class FacePreprocessor:
             borderType=cv2.BORDER_REFLECT_101,
         )
         face = cv2.resize(
-            square, (self.image_size, self.image_size), interpolation=cv2.INTER_LINEAR
+            square, (self.image_size,
+                     self.image_size), interpolation=cv2.INTER_LINEAR
         )
         return AlignedCrop(
             face=face,

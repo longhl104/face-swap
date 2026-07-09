@@ -25,7 +25,8 @@ def augment_image(image: np.ndarray) -> list[np.ndarray]:
     augmented.append(flipped)
 
     for factor in (0.85, 1.15):
-        bright = np.clip(image.astype(np.float32) * factor, 0, 255).astype(np.uint8)
+        bright = np.clip(image.astype(np.float32) *
+                         factor, 0, 255).astype(np.uint8)
         augmented.append(bright)
 
     return augmented
@@ -34,7 +35,6 @@ def augment_image(image: np.ndarray) -> list[np.ndarray]:
 def add_faces_to_dataset(
     source_dir: Path,
     augment: bool = True,
-    image_size: int = 128,
     show_progress: bool = True,
 ) -> int:
     """
@@ -55,7 +55,7 @@ def add_faces_to_dataset(
     iterator = (
         tqdm(new_images, desc="Updating dataset") if show_progress else new_images
     )
-    with FacePreprocessor(image_size=image_size) as preprocessor:
+    with FacePreprocessor() as preprocessor:
         for img_path in iterator:
             image = cv2.imread(str(img_path))
             if image is None:
@@ -66,7 +66,8 @@ def add_faces_to_dataset(
 
             for idx, variant in enumerate(images_to_process):
                 suffix = f"_aug{idx}" if idx > 0 else ""
-                raw_dest = paths.raw_data / "custom" / f"{stem}{suffix}{img_path.suffix}"
+                raw_dest = paths.raw_data / "custom" / \
+                    f"{stem}{suffix}{img_path.suffix}"
                 raw_dest.parent.mkdir(parents=True, exist_ok=True)
                 if idx == 0:
                     shutil.copy2(img_path, raw_dest)
@@ -77,7 +78,8 @@ def add_faces_to_dataset(
                 if face is None:
                     continue
 
-                proc_dest = paths.processed_data / "custom" / f"{stem}{suffix}.npy"
+                proc_dest = paths.processed_data / \
+                    "custom" / f"{stem}{suffix}.npy"
                 proc_dest.parent.mkdir(parents=True, exist_ok=True)
                 np.save(proc_dest, face.astype(np.float32))
                 added += 1
