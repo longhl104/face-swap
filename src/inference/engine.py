@@ -1,5 +1,3 @@
-"""Core face swap inference engine — neural generator only."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,10 +13,8 @@ from src.inference.blending import blend_face_into_image
 
 
 class FaceSwapEngine:
-    """Production-ready neural face swap inference engine."""
-
-    def __init__(self, model_path: Path | None = None, config: dict | None = None) -> None:
-        self.config = config or load_config()
+    def __init__(self) -> None:
+        self.config = load_config()
         self.paths = StoragePaths(self.config)
         self.paths.ensure_dirs()
 
@@ -30,7 +26,7 @@ class FaceSwapEngine:
         self.preprocessor = FacePreprocessor(image_size=self.image_size)
         self.model = FaceSwapModel().to(self.device)
 
-        weights = model_path or self.paths.best_model_path
+        weights = self.paths.best_model_path
         if weights.exists():
             self.model.load_trainable(weights, map_location=self.device)
             print(f"Loaded generator weights from {weights}")
