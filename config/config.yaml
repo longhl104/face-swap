@@ -1,7 +1,7 @@
 # Face Swap System Configuration
 
 # Image dimensions (faces are resized to square crops)
-image_size: 32
+image_size: 256
 
 # Training hyperparameters
 training:

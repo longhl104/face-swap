@@ -1,8 +1,5 @@
-"""Batch preprocessing of raw images into normalized face tensors."""
-
 from __future__ import annotations
 
-import argparse
 import sys
 from pathlib import Path
 
@@ -17,17 +14,13 @@ from src.config import StoragePaths, load_config
 from src.data.preprocess import FacePreprocessor, collect_image_paths
 
 
-def preprocess_dataset(
-    raw_dir: Path | None = None,
-    output_dir: Path | None = None,
-    image_size: int = 128,
-) -> int:
+def preprocess_dataset(image_size: int) -> int:
     """Process all raw images and save aligned face arrays as .npy files."""
     paths = StoragePaths()
     paths.ensure_dirs()
 
-    raw = raw_dir or paths.raw_data
-    out = output_dir or paths.processed_data
+    raw = paths.raw_data
+    out = paths.processed_data
     out.mkdir(parents=True, exist_ok=True)
 
     image_paths = collect_image_paths(raw)
@@ -56,13 +49,8 @@ def preprocess_dataset(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Preprocess LFW faces")
-    parser.add_argument("--raw", type=Path, default=None, help="Raw data directory")
-    parser.add_argument("--output", type=Path, default=None, help="Output directory")
-    args = parser.parse_args()
-
     config = load_config()
-    preprocess_dataset(args.raw, args.output, config["image_size"])
+    preprocess_dataset(config["image_size"])
 
 
 if __name__ == "__main__":
