@@ -20,9 +20,8 @@ class FaceSwapEngine:
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
-        self.image_size = self.config["image_size"]
 
-        self.preprocessor = FacePreprocessor(image_size=self.image_size)
+        self.preprocessor = FacePreprocessor()
         self.model = FaceSwapModel().to(self.device)
 
         weights = self.paths.best_model_path
@@ -62,7 +61,8 @@ class FaceSwapEngine:
         swapped_tensor = self.model.swap(source_tensor, target_tensor)
         swapped_face = self._from_tensor(swapped_tensor)
 
-        feather = bool(self.config.get("inference", {}).get("feather_blend", True))
+        feather = bool(self.config.get(
+            "inference", {}).get("feather_blend", True))
         return blend_face_into_image(
             target_image, swapped_face, target_crop, feather=feather
         )

@@ -1,0 +1,44 @@
+# Face Swap System Configuration
+
+# Image dimensions (faces are resized to square crops)
+image_size: 256
+
+# Training hyperparameters
+training:
+  batch_size: 8
+  epochs: 50
+  learning_rate: 0.0002
+  identity_weight: 10.0     # primary objective — preserve source identity
+  reconstruction_weight: 10.0
+  adversarial_weight: 0.1   # PatchGAN discriminator
+  grad_clip: 1.0             # prevent NaN from gradient explosion
+  val_split: 0.1
+  checkpoint_every: 5
+  chroma_weight: 6.0         # match target hue (Lab a/b)
+  luminance_weight: 4.0     # match target brightness — fixes whitening
+  feature_appearance_weight: 8.0  # eyes/mouth/chin Lab match
+  perceptual_weight: 0.5     # improves realism/detail
+  border_weight: 4.0         # match border pixels to reduce visible edge seams
+  border_grad_weight: 1.0    # match border gradients to avoid haloing
+  border_px: 18              # thickness (pixels) of border ring
+  tv_weight: 0.0             # optional: small (e.g. 0.02) if you see speckle noise
+  amp: true                  # mixed precision on CUDA
+  num_workers: 0
+
+# Video processing (bonus)
+video:
+  temporal_alpha: 0.7
+  max_fps: 30
+
+# Inference compositing
+inference:
+  feather_blend: true
+
+# Storage paths (relative to project root)
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  uploads: data/uploads
+  model_weights: models/weights
+  training_output: outputs/training
+  inference_output: outputs/inference
