@@ -1,5 +1,3 @@
-"""CLI entry point for image face swap inference."""
-
 from __future__ import annotations
 from src.inference.engine import FaceSwapEngine
 
@@ -18,8 +16,6 @@ def main() -> None:
                         required=True, help="Target image")
     parser.add_argument("--output", type=Path, default=None,
                         help="Output image path")
-    parser.add_argument("--model", type=Path, default=None,
-                        help="Model weights path")
     args = parser.parse_args()
 
     with FaceSwapEngine() as engine:
