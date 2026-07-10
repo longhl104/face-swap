@@ -33,11 +33,3 @@ runs/
 .vscode/
 .DS_Store
 Thumbs.db
-
-# Kaggle credentials
-.kaggle/
-kaggle.json
-
-# Environment
-.env
-.env.*

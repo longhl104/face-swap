@@ -49,14 +49,18 @@ def _masked_l1(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> 
 def _sobel_grad(x: torch.Tensor) -> torch.Tensor:
     """Sobel gradients (dx, dy) per channel. Input B3HW -> output B6HW."""
     kx = x.new_tensor(
-        [[-1.0, 0.0, 1.0],
-         [-2.0, 0.0, 2.0],
-         [-1.0, 0.0, 1.0]]
+        [
+            [-1.0, 0.0, 1.0],
+            [-2.0, 0.0, 2.0],
+            [-1.0, 0.0, 1.0]
+        ]
     ).view(1, 1, 3, 3)
     ky = x.new_tensor(
-        [[-1.0, -2.0, -1.0],
-         [0.0, 0.0, 0.0],
-         [1.0, 2.0, 1.0]]
+        [
+            [-1.0, -2.0, -1.0],
+            [0.0, 0.0, 0.0],
+            [1.0, 2.0, 1.0]
+        ]
     ).view(1, 1, 3, 3)
     x_ = x.view(-1, 1, x.shape[-2], x.shape[-1])
     dx = F.conv2d(x_, kx, padding=1)
@@ -182,14 +186,17 @@ def train_epoch(
             id_loss = output.new_tensor(0.0)
 
         recon_loss = F.l1_loss(output, target)
-        chroma_loss = chroma(output, target) if chroma_weight > 0.0 else output.new_tensor(0.0)
-        lum_loss = luminance(output, target) if luminance_weight > 0.0 else output.new_tensor(0.0)
+        chroma_loss = chroma(
+            output, target) if chroma_weight > 0.0 else output.new_tensor(0.0)
+        lum_loss = luminance(
+            output, target) if luminance_weight > 0.0 else output.new_tensor(0.0)
         feat_loss = (
             feature_appearance(output, target)
             if feature_appearance_weight > 0.0
             else output.new_tensor(0.0)
         )
-        perc_loss = perceptual(output, target) if perceptual_weight > 0.0 else output.new_tensor(0.0)
+        perc_loss = perceptual(
+            output, target) if perceptual_weight > 0.0 else output.new_tensor(0.0)
 
         if border_weight > 0.0 and border_px > 0:
             bm = _border_mask(output, border_px)
@@ -313,14 +320,17 @@ def validate(
         else:
             id_loss = output.new_tensor(0.0)
         recon_loss = F.l1_loss(output, target)
-        chroma_loss = chroma(output, target) if chroma_weight > 0.0 else output.new_tensor(0.0)
-        lum_loss = luminance(output, target) if luminance_weight > 0.0 else output.new_tensor(0.0)
+        chroma_loss = chroma(
+            output, target) if chroma_weight > 0.0 else output.new_tensor(0.0)
+        lum_loss = luminance(
+            output, target) if luminance_weight > 0.0 else output.new_tensor(0.0)
         feat_loss = (
             feature_appearance(output, target)
             if feature_appearance_weight > 0.0
             else output.new_tensor(0.0)
         )
-        perc_loss = perceptual(output, target) if perceptual_weight > 0.0 else output.new_tensor(0.0)
+        perc_loss = perceptual(
+            output, target) if perceptual_weight > 0.0 else output.new_tensor(0.0)
 
         if border_weight > 0.0 and border_px > 0:
             bm = _border_mask(output, border_px)
@@ -374,9 +384,9 @@ def validate(
     )
 
 
-def train(config: dict | None = None) -> Path:
+def train() -> Path:
     """Run full training loop and return path to best model weights."""
-    cfg = config or load_config()
+    cfg = load_config()
     train_cfg = cfg["training"]
     paths = StoragePaths(cfg)
     paths.ensure_dirs()
@@ -394,8 +404,9 @@ def train(config: dict | None = None) -> Path:
     val_size = max(1, int(len(dataset) * train_cfg["val_split"]))
     train_size = len(dataset) - val_size
     train_ds, val_ds = random_split(
-        dataset, [train_size,
-                  val_size], generator=torch.Generator().manual_seed(42)
+        dataset,
+        [train_size, val_size],
+        generator=torch.Generator().manual_seed(42)
     )
 
     loader_kwargs = {
@@ -485,7 +496,8 @@ def train(config: dict | None = None) -> Path:
     tv_w = float(train_cfg.get("tv_weight", 0.0))
 
     use_amp = bool(train_cfg.get("amp", True)) and device.type == "cuda"
-    scaler: torch.amp.GradScaler | None = torch.amp.GradScaler("cuda", enabled=use_amp)
+    scaler: torch.amp.GradScaler | None = torch.amp.GradScaler(
+        "cuda", enabled=use_amp)
 
     total_epochs = train_cfg["epochs"]
     if start_epoch >= total_epochs:

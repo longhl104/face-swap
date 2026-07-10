@@ -16,6 +16,8 @@ class PerceptualLoss(nn.Module):
         for param in vgg.parameters():
             param.requires_grad = False
         self.features = vgg
+        # ImageNet RGB mean/std — required because VGG19 was pretrained with this normalization.
+        # https://github.com/pytorch/examples/blob/42e5b996718797e45c46a25c55b031e6768f8440/imagenet/main.py#L89-L101
         self.register_buffer(
             "mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
         )
