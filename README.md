@@ -8,7 +8,7 @@ Replace a face in an image or video with another face while preserving natural e
 - **Dataset update/augmentation** script for adding new faces
 - **Production REST API** (FastAPI) for upload and swap operations
 - **Image & video inference**
-- **Training metrics** — loss and accuracy graphs saved automatically after **every epoch** to `outputs/training/` (`training_metrics.json`, `training_metrics.csv`, `training_metrics.png`)
+- **Training metrics**: loss and accuracy graphs saved automatically after **every epoch** to `outputs/training/` (`training_metrics.json`, `training_metrics.csv`, `training_metrics.png`)
 
 ## Development Environment
 
@@ -29,16 +29,16 @@ The LFW dataset is already downloaded and preprocessed on this machine (`data/ra
 
 ## Project Structure
 
-- `config/` — YAML configuration
-- `data/` — Raw uploads, processed tensors
-- `models/` — Neural network definitions
-- `src/data/` — Download, preprocess, dataset update
-- `src/inference/` — Face swap engine
-- `src/training/` — Training loop and metrics
-- `src/api/` — FastAPI application
-- `scripts/` — CLI entry points
-- `docs/` — Architecture and requirements
-- `outputs/` — Training graphs and inference results
+- `config/`: YAML configuration
+- `data/`: Raw uploads, processed tensors
+- `models/`: Neural network definitions
+- `src/data/`: Download, preprocess, dataset update
+- `src/inference/`: Face swap engine
+- `src/training/`: Training loop and metrics
+- `src/api/`: FastAPI application
+- `scripts/`: CLI entry points
+- `docs/`: Architecture and requirements
+- `outputs/`: Training graphs and inference results
 
 ## Quick Start
 
@@ -49,7 +49,7 @@ py -3.14 -m venv .venv
 # source .venv/bin/activate   # Linux/macOS
 
 # 2. Install dependencies
-pip install -r requirements.txt
+pip install -r requirements.txt --no-deps
 
 # 3. Train the model (dataset already in data/processed/)
 python scripts/train.py
@@ -59,6 +59,9 @@ python scripts/inference.py --source path/to/source.jpg --target path/to/target.
 
 # 5. Start the API server
 python scripts/serve.py
+
+# Open the interactive API docs in your browser:
+# http://localhost:8000/docs
 ```
 
 To download and preprocess LFW from scratch on a new machine:
@@ -70,18 +73,45 @@ python scripts/preprocess_dataset.py
 
 ## API Endpoints
 
-- `POST /upload-source` — Upload source face image
-- `POST /upload-target` — Upload target image/video
-- `POST /swap` — Trigger face swap
-- `GET /health` — Health check
+- `POST /upload-source`: Upload source face image
+- `POST /upload-target`: Upload target image/video
+- `POST /swap`: Trigger face swap
+- `GET /health`: Health check
 
 ## Third-Party Components
 
-- **Identity extractor** — Pretrained **FaceNet** (`facenet-pytorch`, VGGFace2) — frozen
-- **Face detection** — OpenCV YuNet
+- **Identity extractor**: Pretrained **FaceNet** (`facenet-pytorch`, VGGFace2), frozen
+- **Face detection**: OpenCV YuNet
 
 ## Custom Components
 
-- **Generator (U-Net)** — Custom `torch.nn` — trained on LFW
-- **Discriminator** — Custom PatchGAN — trained via adversarial training
-- **Optimizer** — `torch.optim.Adam`
+- **Generator (U-Net)**: Custom `torch.nn`, trained on LFW
+- **Discriminator**: Custom PatchGAN, trained via adversarial training
+- **Optimizer**: `torch.optim.Adam`
+
+## Results
+
+Training metrics and graphs are saved to `outputs/training/` after every epoch:
+
+- `training_metrics.json`: full loss history
+- `training_metrics.csv`: same data in CSV form
+- `training_metrics.png`: loss and identity accuracy plots
+
+After 34 epochs on LFW (256×256 crops, batch size 8):
+
+- **Best validation loss:** 2.03 (epoch 31)
+- **Final validation loss:** 2.08 (epoch 34)
+- **Identity accuracy:** ~89% (cosine similarity between source and swapped FaceNet embeddings)
+
+### Inference quality
+
+Works best on **low-to-medium resolution** images and video up to about **480p**. At that range, swaps preserve identity and blend reasonably with target pose and skin tone.
+
+On **high-resolution** images or video (720p and above), obvious **white patches** can appear in random areas of the face. This is most visible after the swapped 256×256 crop is resized back into a large frame.
+
+### Possible improvements
+
+This can be improved if:
+
+- **`image_size` is increased** (e.g. 512) and the generator is retrained with enough GPU memory. Reduces upscale artifacts on large faces.
+- **A refinement pass** is added after the initial swap (e.g. a small super-resolution or color-correction network on the face crop only).
