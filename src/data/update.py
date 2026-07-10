@@ -1,9 +1,3 @@
-"""Dataset update and augmentation pipeline.
-
-Core logic for growing the training set with new faces. Used by both the
-``scripts/update_dataset.py`` CLI and the FastAPI ``POST /datasets/faces`` endpoint.
-"""
-
 from __future__ import annotations
 
 import shutil
@@ -25,8 +19,9 @@ def augment_image(image: np.ndarray) -> list[np.ndarray]:
     augmented.append(flipped)
 
     for factor in (0.85, 1.15):
-        bright = np.clip(image.astype(np.float32) *
-                         factor, 0, 255).astype(np.uint8)
+        bright = np.clip(
+            image.astype(np.float32) *
+            factor, 0, 255).astype(np.uint8)
         augmented.append(bright)
 
     return augmented
@@ -39,9 +34,6 @@ def add_faces_to_dataset(
 ) -> int:
     """
     Copy new face images into raw storage and preprocess them.
-
-    This is the dataset update method: drop new images into a folder,
-    run this function, and the training set grows automatically.
     """
     paths = StoragePaths()
     paths.ensure_dirs()
@@ -55,6 +47,7 @@ def add_faces_to_dataset(
     iterator = (
         tqdm(new_images, desc="Updating dataset") if show_progress else new_images
     )
+
     with FacePreprocessor() as preprocessor:
         for img_path in iterator:
             image = cv2.imread(str(img_path))
