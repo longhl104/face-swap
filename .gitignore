@@ -3,13 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
-dist/
-build/
-.eggs/
-*.egg
 .venv*/
-venv*/
-env/
 
 # Data & models (large files)
 data/raw/
@@ -17,16 +11,11 @@ data/processed/
 data/uploads/
 models/weights/
 *.pt
-*.pth
 *.onnx
 
 # Training outputs
 outputs/*
 !outputs/.gitkeep
-logs/
-runs/
-*.png
-!docs/**/*.png
 
 # IDE & OS
 .idea/
