@@ -62,6 +62,9 @@ python scripts/serve.py
 
 # Open the interactive API docs in your browser:
 # http://localhost:8000/docs
+#
+# When testing the API, create a session first and reuse its id for
+# source, target, and swap requests (see API Endpoints below).
 ```
 
 To download and preprocess LFW from scratch on a new machine:
@@ -73,9 +76,11 @@ python scripts/preprocess_dataset.py
 
 ## API Endpoints
 
-- `POST /upload-source`: Upload source face image
-- `POST /upload-target`: Upload target image/video
-- `POST /swap`: Trigger face swap
+- `POST /sessions`: Create a face-swap session
+- `PUT /sessions/{session_id}/source`: Upload source face image
+- `PUT /sessions/{session_id}/target`: Upload target image/video
+- `POST /sessions/{session_id}/swaps`: Run face swap and return result
+- `POST /datasets/faces`: Add face images to the training dataset
 - `GET /health`: Health check
 
 ## Third-Party Components

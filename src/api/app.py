@@ -46,41 +46,58 @@ def _save_upload(upload: UploadFile, subdir: str) -> Path:
     return dest
 
 
+def _get_session(session_id: str) -> dict[str, Path]:
+    session = _sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    return session
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/upload-source")
-async def upload_source(
+@app.post("/sessions", status_code=201)
+def create_session() -> dict[str, str]:
+    """Create a new face-swap session."""
+    session_id = uuid.uuid4().hex
+    _sessions[session_id] = {}
+    return {"id": session_id}
+
+
+@app.put("/sessions/{session_id}/source")
+async def set_source(
+    session_id: str,
     file: UploadFile = File(...),
-    session_id: str | None = None,
 ) -> dict[str, str]:
-    sid = session_id or uuid.uuid4().hex
+    """Upload the source face image for a session."""
+    session = _get_session(session_id)
     saved = _save_upload(file, "source")
-    _sessions.setdefault(sid, {})["source"] = saved
-    return {"session_id": sid, "source_path": str(saved)}
+    session["source"] = saved
+    return {"id": session_id, "source_path": str(saved)}
 
 
-@app.post("/upload-target")
-async def upload_target(
+@app.put("/sessions/{session_id}/target")
+async def set_target(
+    session_id: str,
     file: UploadFile = File(...),
-    session_id: str | None = None,
 ) -> dict[str, str]:
-    sid = session_id or uuid.uuid4().hex
+    """Upload the target image or video for a session."""
+    session = _get_session(session_id)
     saved = _save_upload(file, "target")
-    _sessions.setdefault(sid, {})["target"] = saved
-    return {"session_id": sid, "target_path": str(saved)}
+    session["target"] = saved
+    return {"id": session_id, "target_path": str(saved)}
 
 
-@app.post("/swap")
-async def swap(session_id: str) -> FileResponse:
-    """Trigger face swap using previously uploaded source and target."""
-    session = _sessions.get(session_id)
-    if not session or "source" not in session or "target" not in session:
+@app.post("/sessions/{session_id}/swaps")
+async def create_swap(session_id: str) -> FileResponse:
+    """Run face swap for a session with uploaded source and target."""
+    session = _get_session(session_id)
+    if "source" not in session or "target" not in session:
         raise HTTPException(
             status_code=400,
-            detail="Upload both source and target first, or provide a valid session_id.",
+            detail="Upload source and target before creating a swap.",
         )
 
     source_path = session["source"]
@@ -104,13 +121,12 @@ async def swap(session_id: str) -> FileResponse:
     return FileResponse(str(result), media_type="application/octet-stream", filename=result.name)
 
 
-@app.post("/dataset/add")
-async def dataset_add(
+@app.post("/datasets/faces", status_code=201)
+async def add_dataset_faces(
     files: list[UploadFile] = File(...),
     augment: bool = Form(True),
 ) -> dict[str, object]:
-    """Add new face images to the training dataset.
-    """
+    """Add new face images to the training dataset."""
     if not files:
         raise HTTPException(
             status_code=400, detail="Upload at least one image file.")

@@ -1,7 +1,7 @@
 """Dataset update and augmentation pipeline.
 
 Core logic for growing the training set with new faces. Used by both the
-``scripts/update_dataset.py`` CLI and the FastAPI ``/dataset/add`` endpoint.
+``scripts/update_dataset.py`` CLI and the FastAPI ``POST /datasets/faces`` endpoint.
 """
 
 from __future__ import annotations
