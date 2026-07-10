@@ -29,7 +29,7 @@ def preprocess_dataset(image_size: int) -> int:
         return 0
 
     saved = 0
-    with FacePreprocessor(image_size=image_size) as preprocessor:
+    with FacePreprocessor() as preprocessor:
         for img_path in tqdm(image_paths, desc="Preprocessing faces"):
             image = cv2.imread(str(img_path))
             if image is None:
