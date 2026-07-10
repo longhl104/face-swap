@@ -14,16 +14,14 @@ Replace a face in an image or video with another face while preserving natural e
 
 This project is developed and tested on the following machine:
 
-| | |
-|---|---|
-| **OS** | Windows 11 (64-bit) |
-| **Device** | ASUS ProArt |
-| **CPU** | AMD Ryzen AI 9 HX 370 w/ Radeon 890M (2.00 GHz) |
-| **RAM** | 64 GB |
-| **GPU (training)** | NVIDIA GeForce RTX 5070 Laptop GPU (8 GB) |
-| **GPU (integrated)** | AMD Radeon 890M |
-| **Python** | 3.14 |
-| **PyTorch** | 2.13.0+cu132 (CUDA 13.2) |
+- **OS:** Windows 11 (64-bit)
+- **Device:** ASUS ProArt
+- **CPU:** AMD Ryzen AI 9 HX 370 w/ Radeon 890M (2.00 GHz)
+- **RAM:** 64 GB
+- **GPU (training):** NVIDIA GeForce RTX 5070 Laptop GPU (8 GB)
+- **GPU (integrated):** AMD Radeon 890M
+- **Python:** 3.14
+- **PyTorch:** 2.13.0+cu132 (CUDA 13.2)
 
 PyTorch uses the NVIDIA GPU for training and inference. Set `training.num_workers: 0` in `config/config.yaml` on Windows to avoid multiprocessing issues with DataLoader.
 
@@ -31,20 +29,16 @@ The LFW dataset is already downloaded and preprocessed on this machine (`data/ra
 
 ## Project Structure
 
-```
-face-swap/
-├── config/           # YAML configuration
-├── data/             # Raw uploads, processed tensors (gitignored)
-├── models/           # Neural network definitions
-├── src/
-│   ├── data/         # Download, preprocess, dataset update
-│   ├── inference/    # Face swap engine
-│   ├── training/     # Training loop & metrics
-│   └── api/          # FastAPI application
-├── scripts/          # CLI entry points
-├── docs/             # Architecture & requirements
-└── outputs/          # Training graphs & inference results (gitignored)
-```
+- `config/` — YAML configuration
+- `data/` — Raw uploads, processed tensors
+- `models/` — Neural network definitions
+- `src/data/` — Download, preprocess, dataset update
+- `src/inference/` — Face swap engine
+- `src/training/` — Training loop and metrics
+- `src/api/` — FastAPI application
+- `scripts/` — CLI entry points
+- `docs/` — Architecture and requirements
+- `outputs/` — Training graphs and inference results
 
 ## Quick Start
 
@@ -74,48 +68,20 @@ python scripts/download_dataset.py
 python scripts/preprocess_dataset.py
 ```
 
-## Git Learning Milestones
-
-Each major step is tagged for reference:
-
-| Tag     | Milestone                          |
-|---------|------------------------------------|
-| v0.1.0  | Project scaffold                   |
-| v0.2.0  | Config & storage layer             |
-| v0.3.0  | Data pipeline                      |
-| v0.4.0  | Model architecture                 |
-| v0.5.0  | Training script & metrics          |
-| v0.6.0  | Inference engine                   |
-| v0.7.0  | FastAPI production interface       |
-| v0.8.0  | Video support                      |
-
-```bash
-git tag -l          # list all milestone tags
-git show v0.3.0     # inspect a specific step
-```
-
 ## API Endpoints
 
-| Method | Endpoint          | Description              |
-|--------|-------------------|--------------------------|
-| POST   | `/upload-source`  | Upload source face image |
-| POST   | `/upload-target`  | Upload target image/video |
-| POST   | `/swap`           | Trigger face swap        |
-| GET    | `/health`         | Health check             |
+- `POST /upload-source` — Upload source face image
+- `POST /upload-target` — Upload target image/video
+- `POST /swap` — Trigger face swap
+- `GET /health` — Health check
 
-## Third-Party vs Custom Components
+## Third-Party Components
 
-| Component | Source | Trained by you? |
-|-----------|--------|-----------------|
-| **Generator (U-Net)** | Custom `torch.nn` | Yes |
-| **Identity extractor** | Pretrained **FaceNet** (`facenet-pytorch`, VGGFace2) | No — frozen |
-| **Face detection** | OpenCV YuNet | No |
-| **Face mask (inference)** | BiSeNet face parsing ONNX (CelebAMask-HQ) | No — frozen |
-| **Discriminator** | Custom PatchGAN | Yes (adversarial training) |
-| **Optimizer** | `torch.optim.Adam` | N/A |
+- **Identity extractor** — Pretrained **FaceNet** (`facenet-pytorch`, VGGFace2) — frozen
+- **Face detection** — OpenCV YuNet
 
-Only the **generator** is trained on LFW. FaceNet converts the source face into a 512-d identity vector; the generator learns to synthesize the target pose with that identity.
+## Custom Components
 
-## License
-
-Educational project — use responsibly and ethically.
+- **Generator (U-Net)** — Custom `torch.nn` — trained on LFW
+- **Discriminator** — Custom PatchGAN — trained via adversarial training
+- **Optimizer** — `torch.optim.Adam`
