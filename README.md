@@ -80,7 +80,7 @@ python scripts/preprocess_dataset.py
 - `PUT /sessions/{session_id}/source`: Upload source face image
 - `PUT /sessions/{session_id}/target`: Upload target image/video
 - `POST /sessions/{session_id}/swaps`: Run face swap and return result
-- `POST /datasets/faces`: Add face images to the training dataset
+- `POST /datasets/faces`: Add a face image to the training dataset (call once per image)
 - `GET /health`: Health check
 
 ## Third-Party Components

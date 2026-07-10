@@ -7,7 +7,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse  # pyright: ignore[reportAttributeAccessIssue] # nopep8
 
 from src.config import StoragePaths, load_config
@@ -123,23 +123,16 @@ async def create_swap(session_id: str) -> FileResponse:
 
 @app.post("/datasets/faces", status_code=201)
 async def add_dataset_faces(
-    files: list[UploadFile] = File(...),
-    augment: bool = Form(True),
+    file: UploadFile = File(..., description="Face image to add to the dataset"),
+    augment: bool = Query(True, description="Apply flip and brightness augmentations"),
 ) -> dict[str, object]:
-    """Add new face images to the training dataset."""
-    if not files:
-        raise HTTPException(
-            status_code=400, detail="Upload at least one image file.")
-
+    """Add a face image to the training dataset."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
-        received = 0
-        for upload in files:
-            suffix = Path(upload.filename or "file.jpg").suffix or ".jpg"
-            dest = tmp_dir / f"{uuid.uuid4().hex}{suffix}"
-            with open(dest, "wb") as f:
-                shutil.copyfileobj(upload.file, f)
-            received += 1
+        suffix = Path(file.filename or "file.jpg").suffix or ".jpg"
+        dest = tmp_dir / f"{uuid.uuid4().hex}{suffix}"
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(file.file, f)
 
         added = add_faces_to_dataset(
             tmp_dir,
@@ -150,7 +143,7 @@ async def add_dataset_faces(
     if added == 0:
         raise HTTPException(
             status_code=422,
-            detail="No faces could be detected in the uploaded images.",
+            detail="No faces could be detected in the uploaded image.",
         )
 
-    return {"files_received": received, "samples_added": added, "augmented": augment}
+    return {"files_received": 1, "samples_added": added, "augmented": augment}
