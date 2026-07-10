@@ -48,11 +48,10 @@ def swap_video(
     source_path: Path,
     target_path: Path,
     output_path: Path,
-    max_fps: int | None = None,
 ) -> Path:
     """Process a video frame-by-frame."""
     video_cfg = engine.config.get("video", {})
-    fps_limit = max_fps or video_cfg.get("max_fps", 30)
+    fps_limit = video_cfg.get("max_fps", 30)
 
     source_img = cv2.imread(str(source_path))
     if source_img is None:
@@ -75,8 +74,11 @@ def swap_video(
     ) as tmp:
         silent_path = Path(tmp.name)
 
-    writer = cv2.VideoWriter(str(silent_path), fourcc,
-                             out_fps, (width, height))
+    writer = cv2.VideoWriter(
+        str(silent_path),
+        fourcc,
+        out_fps,
+        (width, height))
 
     frame_skip = max(1, int(src_fps / out_fps))
     frame_idx = 0
