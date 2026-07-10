@@ -16,9 +16,3 @@ models/weights/
 # Training outputs
 outputs/*
 !outputs/.gitkeep
-
-# IDE & OS
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
