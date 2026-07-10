@@ -32,18 +32,7 @@ def blend_face_into_image(
     original: np.ndarray,
     swapped_face: np.ndarray,
     crop: AlignedCrop,
-    feather: bool = True,
 ) -> np.ndarray:
-    """Reinsert the swapped face into the exact region it was cropped from.
-
-    The swapped output is mapped back onto ``crop.crop_rect`` using the same
-    geometry ``align_crop`` produced, and the reflection padding added to make
-    the crop square is stripped off first. This keeps the face aligned and
-    avoids the mirrored-edge "ghost" (nested face) artifact.
-
-    When ``feather`` is True, an elliptical alpha mask softens the crop edges so
-    the rectangular paste boundary is not visible in the final image.
-    """
     x1, y1, x2, y2 = crop.crop_rect
     top, bottom, left, right = crop.pad
     ch, cw = y2 - y1, x2 - x1
@@ -51,12 +40,12 @@ def blend_face_into_image(
     square = cv2.resize(
         swapped_face, (crop.side, crop.side), interpolation=cv2.INTER_LINEAR
     )
-    face = square[top : top + ch, left : left + cw]
+    face = square[top: top + ch, left: left + cw]
 
     result = original.copy()
     region = result[y1:y2, x1:x2]
 
-    if not feather or ch < 4 or cw < 4:
+    if ch < 4 or cw < 4:
         result[y1:y2, x1:x2] = face
         return result
 

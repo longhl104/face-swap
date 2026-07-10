@@ -29,10 +29,6 @@ training:
 video:
   max_fps: 30
 
-# Inference compositing
-inference:
-  feather_blend: true
-
 # Storage paths (relative to project root)
 paths:
   raw_data: data/raw
