@@ -1,7 +1,6 @@
 """Download the LFW dataset from Kaggle via kagglehub."""
 
 from __future__ import annotations
-from src.config import StoragePaths, load_config
 import kagglehub
 
 import shutil
@@ -9,6 +8,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.config import StoragePaths, load_config
 
 
 def download_lfw_dataset(dest: Path | None = None) -> Path:
