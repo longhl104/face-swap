@@ -1,4 +1,4 @@
-"""Video face swapping with temporal smoothing."""
+"""Video face swapping."""
 
 from __future__ import annotations
 
@@ -43,27 +43,6 @@ def _mux_audio(source_video: Path, silent_video: Path, output_video: Path) -> bo
     return True
 
 
-class TemporalSmoother:
-    """Exponential moving average smoothing for face landmarks across frames."""
-
-    def __init__(self, alpha: float = 0.7) -> None:
-        self.alpha = alpha
-        self._prev_bbox: tuple[int, int, int, int] | None = None
-
-    def smooth(self, bbox: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
-        if self._prev_bbox is None:
-            self._prev_bbox = bbox
-            return bbox
-
-        smoothed = tuple(
-            int(self.alpha * prev + (1 - self.alpha) * curr)
-            for prev, curr in zip(self._prev_bbox, bbox)
-        )
-
-        self._prev_bbox = smoothed  # pyright: ignore[reportAttributeAccessIssue] # nopep8
-        return smoothed  # type: ignore[return-value]
-
-
 def swap_video(
     engine: FaceSwapEngine,
     source_path: Path,
@@ -71,13 +50,8 @@ def swap_video(
     output_path: Path,
     max_fps: int | None = None,
 ) -> Path:
-    """
-    Process a video frame-by-frame with temporal smoothing.
-
-    Ensures smooth pose and expression transitions across frames.
-    """
+    """Process a video frame-by-frame."""
     video_cfg = engine.config.get("video", {})
-    alpha = video_cfg.get("temporal_alpha", 0.7)
     fps_limit = max_fps or video_cfg.get("max_fps", 30)
 
     source_img = cv2.imread(str(source_path))
@@ -104,7 +78,6 @@ def swap_video(
     writer = cv2.VideoWriter(str(silent_path), fourcc,
                              out_fps, (width, height))
 
-    smoother = TemporalSmoother(alpha=alpha)
     frame_skip = max(1, int(src_fps / out_fps))
     frame_idx = 0
 
@@ -117,14 +90,8 @@ def swap_video(
             frame_idx += 1
             continue
 
-        # Apply temporal smoothing to face detection
         region = engine.preprocessor.detect_face(frame)
         if region is not None:
-            smoothed_bbox = smoother.smooth(region.bbox)
-            from src.data.preprocess import FaceRegion
-
-            region = FaceRegion(bbox=smoothed_bbox, landmarks=region.landmarks)
-
             source_region = engine.preprocessor.detect_face(source_img)
             if source_region is not None:
                 source_face = engine.preprocessor.crop_and_align(

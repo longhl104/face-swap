@@ -1,4 +1,4 @@
-# AI-Powered Face Swap System
+# My Face Swap System
 
 Replace a face in an image or video with another face while preserving natural expressions, skin tone, and seamless blending.
 
@@ -7,8 +7,27 @@ Replace a face in an image or video with another face while preserving natural e
 - **Training pipeline** on the [LFW dataset](https://www.kaggle.com/datasets/atulanandjha/lfwpeople) via KaggleHub
 - **Dataset update/augmentation** script for adding new faces
 - **Production REST API** (FastAPI) for upload and swap operations
-- **Image & video inference** with temporal smoothing for videos
+- **Image & video inference**
 - **Training metrics** — loss and accuracy graphs saved automatically after **every epoch** to `outputs/training/` (`training_metrics.json`, `training_metrics.csv`, `training_metrics.png`)
+
+## Development Environment
+
+This project is developed and tested on the following machine:
+
+| | |
+|---|---|
+| **OS** | Windows 11 (64-bit) |
+| **Device** | ASUS ProArt |
+| **CPU** | AMD Ryzen AI 9 HX 370 w/ Radeon 890M (2.00 GHz) |
+| **RAM** | 64 GB |
+| **GPU (training)** | NVIDIA GeForce RTX 5070 Laptop GPU (8 GB) |
+| **GPU (integrated)** | AMD Radeon 890M |
+| **Python** | 3.14 |
+| **PyTorch** | 2.13.0+cu132 (CUDA 13.2) |
+
+PyTorch uses the NVIDIA GPU for training and inference. Set `training.num_workers: 0` in `config/config.yaml` on Windows to avoid multiprocessing issues with DataLoader.
+
+The LFW dataset is already downloaded and preprocessed on this machine (`data/raw/`, `data/processed/`). You can go straight to training.
 
 ## Project Structure
 
@@ -31,25 +50,28 @@ face-swap/
 
 ```bash
 # 1. Create virtual environment
-python -m venv .venv
+py -3.14 -m venv .venv
 .venv\Scripts\activate        # Windows
 # source .venv/bin/activate   # Linux/macOS
 
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Download & preprocess LFW dataset
-python scripts/download_dataset.py
-python scripts/preprocess_dataset.py
-
-# 4. Train the model
+# 3. Train the model (dataset already in data/processed/)
 python scripts/train.py
 
-# 5. Run inference (CLI)
+# 4. Run inference (CLI)
 python scripts/inference.py --source path/to/source.jpg --target path/to/target.jpg
 
-# 6. Start the API server
+# 5. Start the API server
 python scripts/serve.py
+```
+
+To download and preprocess LFW from scratch on a new machine:
+
+```bash
+python scripts/download_dataset.py
+python scripts/preprocess_dataset.py
 ```
 
 ## Git Learning Milestones
@@ -65,7 +87,7 @@ Each major step is tagged for reference:
 | v0.5.0  | Training script & metrics          |
 | v0.6.0  | Inference engine                   |
 | v0.7.0  | FastAPI production interface       |
-| v0.8.0  | Video support & temporal smoothing |
+| v0.8.0  | Video support                      |
 
 ```bash
 git tag -l          # list all milestone tags

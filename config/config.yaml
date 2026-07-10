@@ -27,7 +27,6 @@ training:
 
 # Video processing (bonus)
 video:
-  temporal_alpha: 0.7
   max_fps: 30
 
 # Inference compositing

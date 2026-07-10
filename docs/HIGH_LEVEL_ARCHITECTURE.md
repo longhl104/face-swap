@@ -20,7 +20,6 @@ graph TD
     %% Inference Engine (Real-time & Video Processing)
     subgraph ML_Inference [Face Swap Inference Engine]
         Preprocess_Infer[OpenCV/Dlib: Face Detect, Crop & Align]
-        Temporal_Smooth[Temporal Smoothing - Video Bonus]
         ID_Extractor[Identity Extractor: ArcFace/FaceNet]
         Generator[Generative Model: Autoencoder/GAN]
         Postprocess[Color Blending & Reinsertion]
@@ -54,8 +53,7 @@ graph TD
     
     %% Inference Flow
     Swap_Action --> Preprocess_Infer
-    Preprocess_Infer --> Temporal_Smooth
-    Temporal_Smooth --> ID_Extractor
+    Preprocess_Infer --> ID_Extractor
     ID_Extractor -->|Source Identity Embeddings| Generator
     Preprocess_Infer -->|Target Pose/Expression| Generator
     Generator --> Postprocess
@@ -84,7 +82,7 @@ graph TD
 **Production Interface:** This section fulfills the requirement to create a production-ready interface script. It abstracts the backend REST endpoints that handle the ingestion of media and trigger the processing loop.
 
 
-* **Face Swap Inference Engine:** This is the core application logic. It maps out the flow from initial face detection (using OpenCV/Dlib) to the deep learning generation. I have included a "Temporal Smoothing" node to account for the bonus requirement to ensure smooth transitions on video frames.
+* **Face Swap Inference Engine:** This is the core application logic. It maps out the flow from initial face detection (using OpenCV/Dlib) to the deep learning generation.
 
 
 * 
