@@ -16,3 +16,6 @@ models/weights/
 # Training outputs
 outputs/*
 !outputs/.gitkeep
+
+# Node.js
+node_modules/
