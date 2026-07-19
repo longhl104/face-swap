@@ -35,6 +35,8 @@ Rendered files land in `video_graphics/media/videos/<scene_file>/<quality>/` (gi
 | Scene | File | Used in script |
 | --- | --- | --- |
 | `DeepfakeEquation` — "Deep Learning + Fake = Deepfake" | `scenes/deepfake_equation.py` | Part 1, 0:20–1:30 (Deepfake vs Face Swap) |
+| `DeepfakeMindmap` — deepfake forms mind map, Face Swap highlighted | `scenes/deepfake_mindmap.py` | Part 1, 0:20–1:30 (examples: đổi mặt, nhép môi, giả giọng) |
+| `NeuralNetwork` — numbers flow through layers, features get complex | `scenes/neural_network.py` | Part 1, 0:20–1:30 (học sâu / mạng nơ-ron nhiều lớp) |
 
 ## Adding a new scene
 
