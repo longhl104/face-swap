@@ -1,0 +1,43 @@
+# Video Graphics
+
+Animated graphics for the Face Swap YouTube series, built with [Manim Community](https://www.manim.community/). Each scene in `scenes/` is one clip that can be rendered to MP4 (or MOV with a transparent background) and dropped into the video editor.
+
+## Setup
+
+```bash
+# From the repo root (Manim needs Python <= 3.13, so use 3.12 here)
+py -3.12 -m venv video_graphics/.venv
+video_graphics\.venv\Scripts\activate
+pip install -r video_graphics/requirements.txt
+```
+
+## Rendering
+
+Run Manim from inside `video_graphics/` so it picks up `manim.cfg` (1080p60 by default):
+
+```bash
+cd video_graphics
+
+# Preview quality (fast), opens the file when done
+manim -pql scenes/deepfake_equation.py DeepfakeEquation
+
+# Final quality 1080p60
+manim -qh scenes/deepfake_equation.py DeepfakeEquation
+
+# Transparent background (.mov) for overlaying in the editor
+manim -qh -t scenes/deepfake_equation.py DeepfakeEquation
+```
+
+Rendered files land in `video_graphics/media/videos/<scene_file>/<quality>/` (git-ignored).
+
+## Scenes
+
+| Scene | File | Used in script |
+| --- | --- | --- |
+| `DeepfakeEquation` — "Deep Learning + Fake = Deepfake" | `scenes/deepfake_equation.py` | Part 1, 0:20–1:30 (Deepfake vs Face Swap) |
+
+## Adding a new scene
+
+1. Create a new file in `scenes/` (one file per graphic keeps renders organized).
+2. Subclass `manim.Scene` and implement `construct()`.
+3. Reuse the palette from `deepfake_equation.py` (`#0d1117` background, blue `#4da6ff`, red `#ff5c5c`) so clips look consistent across the series.

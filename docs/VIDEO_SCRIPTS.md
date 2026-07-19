@@ -15,9 +15,11 @@ Cuối đoạn tin, màn hình chuyển sang video do mô hình của tôi xử 
 
 Những vụ việc vừa rồi cho thấy deepfake không còn chỉ là một hiệu ứng giải trí. Khi hình ảnh, video và giọng nói có thể bị giả mạo một cách thuyết phục, công nghệ này có thể gây ra những hậu quả rất thật.
 
-Nhưng những nội dung giả mạo ấy được tạo ra như thế nào? Vì deepfake là một chủ đề rất rộng, trước tiên trong series này, tôi sẽ tập trung vào một kỹ thuật phổ biến: dùng mô hình trí tuệ nhân tạo, hay AI, để đưa khuôn mặt của một người vào ảnh hoặc video của người khác hay coò gọi là face swap. Và để tìm hiểu cách nó hoạt động, tôi đã tự xây dựng một mô hình. Đây là kết quả.
+Nhưng những nội dung giả mạo ấy được tạo ra như thế nào? Vì deepfake là một chủ đề rất rộng, trước tiên trong series này, tôi sẽ tập trung vào một kỹ thuật phổ biến: dùng mô hình trí tuệ nhân tạo, hay AI, để đưa khuôn mặt của một người vào ảnh hoặc video của người khác, còn gọi là face swap. Và để tìm hiểu cách nó hoạt động, tôi đã tự xây dựng một mô hình.
 
 **[Chèn trước/sau]** Hiển thị ảnh hoặc video gốc bên trái, kết quả face swap bên phải.
+
+Như các bạn có thể thấy, mô hình của tôi đã thay khuôn mặt của Mbappé bằng khuôn mặt của Messi, đồng thời vẫn giữ được biểu cảm, góc mặt và ánh sáng của ảnh Mbappé, giúp kết quả trông tương đối tự nhiên. Tôi sẽ đi sâu vào cách mô hình này hoạt động trong các phần tiếp theo của series.
 
 Trước hết, deepfake và face swap khác nhau như thế nào?
 
@@ -31,9 +33,11 @@ Chúng ta cần phân biệt hai khái niệm thường bị dùng lẫn với n
 
 Deepfake là khái niệm rộng, chỉ những nội dung giả hoặc bị chỉnh sửa bằng kỹ thuật học sâu, hay deep learning.
 
-Học sâu là một phương pháp giúp máy tính học từ lượng lớn dữ liệu bằng mạng nơ-ron gồm nhiều lớp. Với hình ảnh, các lớp đầu có thể học những đặc điểm đơn giản như đường nét và màu sắc; các lớp sâu hơn dần nhận ra những đặc điểm phức tạp như mắt, mũi hoặc cả khuôn mặt.
+Học sâu là một phương pháp giúp máy tính học từ lượng lớn dữ liệu bằng mạng nơ-ron gồm nhiều lớp. Mạng nơ-ron là một mô hình toán học lấy cảm hứng từ cách các tế bào thần kinh kết nối với nhau. Nó gồm nhiều nút xử lý: mỗi nút nhận các con số, biến đổi chúng rồi truyền kết quả sang lớp tiếp theo.
 
-Nội dung deepfake có thể là hình ảnh, video hoặc âm thanh. Chẳng hạn, deepfake có thể khiến một người trông như đang nói điều họ chưa từng nói, bắt chước giọng nói, thay đổi biểu cảm hoặc đưa khuôn mặt của họ vào một video khác.
+Với hình ảnh, các lớp đầu có thể học những đặc điểm đơn giản như đường nét và màu sắc; các lớp sâu hơn dần nhận ra những đặc điểm phức tạp như mắt, mũi hoặc cả khuôn mặt. Chính khả năng nhận biết và tái tạo những đặc điểm này là nền tảng để deepfake tạo ra nội dung giả mạo ngày càng thuyết phục.
+
+Vì vậy, deepfake có thể xuất hiện dưới nhiều dạng như hình ảnh, video hoặc âm thanh. Nó có thể khiến một người trông như đang nói điều họ chưa từng nói, bắt chước giọng nói, thay đổi biểu cảm hoặc đưa khuôn mặt của họ vào một video khác.
 
 Face swap là một bài toán cụ thể hơn: chuyển danh tính khuôn mặt của một người sang khuôn mặt của người khác. Vì vậy, face swap có thể được xem là một ứng dụng của deepfake, nhưng deepfake không chỉ có face swap.
 

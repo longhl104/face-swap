@@ -17,5 +17,8 @@ models/weights/
 outputs/*
 !outputs/.gitkeep
 
+# Manim render output
+video_graphics/media/
+
 # Node.js
 node_modules/
