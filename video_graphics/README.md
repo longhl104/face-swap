@@ -38,6 +38,7 @@ Rendered files land in `video_graphics/media/videos/<scene_file>/<quality>/` (gi
 | `DeepfakeMindmap` — deepfake forms mind map, Face Swap highlighted | `scenes/deepfake_mindmap.py` | Part 1, 0:20–1:30 (examples: đổi mặt, nhép môi, giả giọng) |
 | `NeuralNetwork` — numbers flow through layers, features get complex | `scenes/neural_network.py` | Part 1, 0:20–1:30 (học sâu / mạng nơ-ron nhiều lớp) |
 | `DeepfakeForms` — forms (image/video/audio) and what deepfake can do | `scenes/deepfake_forms.py` | Part 1, 0:20–1:30 (deepfake xuất hiện dưới nhiều dạng) |
+| `FaceSwapDefinition` — identity moves from A to B, then face swap inside the deepfake set | `scenes/face_swap_definition.py` | Part 1, 0:20–1:30 (face swap là một ứng dụng của deepfake) |
 
 ## Adding a new scene
 

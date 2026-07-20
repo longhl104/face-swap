@@ -7,13 +7,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.config import load_config
 from src.training.trainer import train
 
 
 def main() -> None:
-    config = load_config()
-    best_path = train(config)
+    best_path = train()
     print(f"\nTraining complete. Best model: {best_path}")
 
 
