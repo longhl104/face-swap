@@ -39,6 +39,8 @@ Rendered files land in `video_graphics/media/videos/<scene_file>/<quality>/` (gi
 | `NeuralNetwork` — numbers flow through layers, features get complex | `scenes/neural_network.py` | Part 1, 0:20–1:30 (học sâu / mạng nơ-ron nhiều lớp) |
 | `DeepfakeForms` — forms (image/video/audio) and what deepfake can do | `scenes/deepfake_forms.py` | Part 1, 0:20–1:30 (deepfake xuất hiện dưới nhiều dạng) |
 | `FaceSwapDefinition` — identity moves from A to B, then face swap inside the deepfake set | `scenes/face_swap_definition.py` | Part 1, 0:20–1:30 (face swap là một ứng dụng của deepfake) |
+| `SourceTargetRoles` — nguồn vs đích, not cut-and-paste, identity vs expression | `scenes/source_target_roles.py` | Part 1, 0:20–1:30 (người nguồn / người đích) |
+| `Part1Outro` — flash results, comment CTA, then Phần 2 title card | `scenes/part1_outro.py` | Part 1, 2:15–2:45 (kết thúc phần 1) |
 
 ## Adding a new scene
 
