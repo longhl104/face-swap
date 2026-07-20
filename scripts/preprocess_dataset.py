@@ -10,11 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import cv2
 
-from src.config import StoragePaths, load_config
+from src.config import StoragePaths
 from src.data.preprocess import FacePreprocessor, collect_image_paths
 
 
-def preprocess_dataset(image_size: int) -> int:
+def preprocess_dataset() -> int:
     """Process all raw images and save aligned face arrays as .npy files."""
     paths = StoragePaths()
     paths.ensure_dirs()
@@ -49,8 +49,7 @@ def preprocess_dataset(image_size: int) -> int:
 
 
 def main() -> None:
-    config = load_config()
-    preprocess_dataset(config["image_size"])
+    preprocess_dataset()
 
 
 if __name__ == "__main__":
