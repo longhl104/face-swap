@@ -6,6 +6,8 @@
 
 ## 0:00–0:35 — Bài toán chúng ta muốn giải quyết
 
+**[Hình ảnh]** `Part2Problem` (`video_graphics/scenes/part2_problem.py`): hai đầu vào source/target → hộp “Mô hình Face Swap” → kết quả, kèm 3 yêu cầu (giữ danh tính nguồn, theo góc mặt/biểu cảm/ánh sáng của đích, hòa vào khung hình).
+
 Ở phần trước, chúng ta đã nói về deepfake, face swap, và bản chất của mô hình AI. Trong phần này, chúng ta xây dựng mô hình face swap — nhưng chưa đi vào huấn luyện. Trước hết cần rõ bài toán, khung mô hình, rồi chuẩn bị dữ liệu cho đúng.
 
 Mô hình của chúng ta nhận hai đầu vào.
