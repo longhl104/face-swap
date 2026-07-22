@@ -42,6 +42,7 @@ Rendered files land in `video_graphics/media/videos/<scene_file>/<quality>/` (gi
 | `SourceTargetRoles` — nguồn vs đích, not cut-and-paste, identity vs expression | `scenes/source_target_roles.py` | Part 1, 0:20–1:30 (người nguồn / người đích) |
 | `Part1Outro` — flash results, comment CTA, then Phần 2 title card | `scenes/part1_outro.py` | Part 1, 2:15–2:45 (kết thúc phần 1) |
 | `Part2Problem` — two inputs (source/target) → model → result + 3 requirements | `scenes/part2_problem.py` | Part 2, 0:00–0:35 (bài toán) |
+| `Part2ModelOverview` — two jobs, FaceNet → identity vector, Generator, compress/redraw, U-Net skip connections | `scenes/part2_model_overview.py` | Part 2, 0:35–1:55 (mô hình hoạt động như thế nào) |
 
 ## Adding a new scene
 

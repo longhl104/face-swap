@@ -18,7 +18,9 @@ Kết quả cần giữ được những đặc điểm nhận dạng của sour
 
 ## 0:35–1:55 — Mô hình hoạt động như thế nào?
 
-Nếu nghĩ theo cách thông thường, face swap cần làm được hai việc: biết khuôn mặt “là ai”, và vẽ lại khuôn mặt đó lên người đích. Người đích chính là target — người cung cấp góc mặt, biểu cảm, ánh sáng và khung hình mà khuôn mặt mới sẽ được đặt vào.
+**[Hình ảnh]** `Part2ModelOverview` (`video_graphics/scenes/part2_model_overview.py`), 6 pha khớp lời thoại: (1) hai việc cần làm, (2) FaceNet → dãy số danh tính, (3) Generator nhận danh tính + đặc điểm target, (4) nén → bản tóm tắt → vẽ lại (cảnh báo mất chi tiết), (5) sơ đồ U-Net với đường nối tắt + gốc y sinh, (6) tóm tắt hai thành phần, Discriminator/loss để sau.
+
+Nếu nghĩ theo cách thông thường, face swap cần làm được hai việc: biết khuôn mặt “là ai”, và vẽ lại khuôn mặt đó lên người đích.
 
 Thứ nhất, chúng ta cần một cách nhận biết danh tính khuôn mặt. Nếu tự dạy mô hình “nhận mặt” từ đầu, sẽ rất lâu và dễ lệch. Vì vậy chúng ta dùng **FaceNet** — một mô hình đã được huấn luyện trước để biến khuôn mặt thành một dãy số đại diện cho danh tính.
 
@@ -26,9 +28,9 @@ Thứ hai, chúng ta cần phần “vẽ lại” khuôn mặt. Đó là **Gene
 
 Generator không giữ nguyên từng điểm ảnh rồi chỉnh từng chỗ như Photoshop. Một bức ảnh có quá nhiều điểm ảnh để mô hình xử lý theo kiểu đó. Cách phổ biến là mô hình **nén** ảnh xuống thành một bản tóm tắt nhỏ — chỉ giữ những gì quan trọng như “đang cười, quay trái, ánh sáng thế nào” — rồi từ bản tóm tắt đó **vẽ lại** khuôn mặt mới.
 
-Nếu chỉ nén rồi khôi phục một cách đơn giản, danh tính có thể còn, nhưng vị trí mắt, miệng và cấu trúc khuôn mặt dễ mất. Vì vậy Generator của chúng ta dùng kiến trúc **U-Net**: chúng ta có các đường nối tắt giữa phần nén và phần vẽ lại — giống như vừa gửi bản tóm tắt, vừa kèm theo vài “ảnh phác thảo” độ phân giải cao hơn để khi vẽ lại vẫn biết mắt và miệng nằm đâu. Kiến trúc này vốn được đề xuất để khoanh vùng tế bào trên ảnh kính hiển vi trong y học; về sau được dùng rộng trong các bài toán ảnh, kể cả face swap.
+Vì vậy Generator của chúng ta dùng kiến trúc **U-Net**: chúng ta có các đường nối tắt giữa phần nén và phần vẽ lại — giống như vừa gửi bản tóm tắt, vừa kèm theo vài “ảnh phác thảo” độ phân giải cao hơn để khi vẽ lại vẫn biết mắt và miệng nằm đâu. Kiến trúc này vốn được đề xuất để khoanh vùng tế bào trên ảnh kính hiển vi trong y học; về sau được dùng rộng trong các bài toán ảnh, kể cả face swap.
 
-Đó là hai thành phần chính trong mô hình của chúng ta. Hệ thống còn có thêm Discriminator và quá trình huấn luyện với nhiều hàm mất mát hay còn gọi là loss functions; những phần đó sẽ được nói kỹ ở các video sau. Phần này tập trung vào việc chuẩn bị: chọn dữ liệu và đưa ảnh về dạng mô hình có thể học được.
+Đó là hai thành phần chính trong mô hình của chúng ta. Hệ thống còn có thêm Discriminator và quá trình huấn luyện với nhiều hàm mất mát hay còn gọi là loss functions; những phần đó sẽ được nói kỹ ở các video sau.
 
 ## 1:55–2:40 — Dữ liệu và chuẩn bị
 
