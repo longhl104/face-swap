@@ -10,8 +10,11 @@ Illustrates VIDEO_SCRIPTS_2.md Part 2, 0:35-1:55 (Mô hình hoạt động như 
   originally proposed for biomedical (cell) segmentation (separate screen)
 - Discriminator + loss functions are saved for later episodes
 
-Uses assets/images/{source-1,target-1,result-1,unet-origin-input,unet-origin-output}.*
-when present.
+Uses assets/images/{source-1,target-1,result-1,unet-origin-*,unet-enc-*,
+unet-dec-*,unet-bottleneck}.* when present.
+Generate the U-Net stage images with:
+
+    python scripts/generate_unet_presentation.py
 
 Render (from the video_graphics/ folder):
 
@@ -39,7 +42,6 @@ from manim import (
     ImageMobject,
     Indicate,
     LaggedStart,
-    Rectangle,
     RoundedRectangle,
     Scene,
     SVGMobject,
@@ -346,59 +348,77 @@ class Part2ModelOverview(Scene):
             font=FONT,
             weight=BOLD,
             color=ACCENT_GREEN,
-            font_size=28,
-            line_spacing=0.9,
-        ).to_edge(UP, buff=0.5)
+            font_size=26,
+            line_spacing=0.85,
+        ).to_edge(UP, buff=0.25)
 
-        def unet_block(width: float, color: str) -> Rectangle:
-            return Rectangle(
-                width=width,
-                height=0.52,
+        def unet_stage(stem: str, width: float, color: str) -> Group:
+            content = photo(stem, color, width)
+            frame = RoundedRectangle(
+                corner_radius=0.1,
+                width=content.width + 0.14,
+                height=content.height + 0.14,
                 fill_color=CARD_FILL,
                 fill_opacity=1.0,
                 stroke_color=color,
                 stroke_width=3,
             )
+            content.move_to(frame)
+            return Group(frame, content)
 
-        enc = VGroup(
-            unet_block(2.6, ACCENT_PURPLE),
-            unet_block(1.9, ACCENT_PURPLE),
-            unet_block(1.2, ACCENT_PURPLE),
-        ).arrange(DOWN, buff=0.42)
-        dec = VGroup(
-            unet_block(2.6, ACCENT_PINK),
-            unet_block(1.9, ACCENT_PINK),
-            unet_block(1.2, ACCENT_PINK),
-        ).arrange(DOWN, buff=0.42)
-        enc.move_to(LEFT * 2.9 + DOWN * 0.55)
-        dec.move_to(RIGHT * 2.9 + DOWN * 0.55)
-        # Align each decoder block with its encoder level.
-        for e, d in zip(enc, dec):
-            d.set_y(e.get_y())
+        stage_widths = (1.35, 1.0, 0.75)
+        enc = Group(*[
+            unet_stage(f"unet-enc-{i}", w, ACCENT_PURPLE)
+            for i, w in enumerate(stage_widths, start=1)
+        ])
+        dec = Group(*[
+            unet_stage(f"unet-dec-{i}", w, ACCENT_PINK)
+            for i, w in enumerate(stage_widths, start=1)
+        ])
+        bottom = unet_stage("unet-bottleneck", 0.7, ACCENT_GREEN)
 
-        bottom = unet_block(1.2, ACCENT_GREEN)
-        bottom.move_to(DOWN * 2.35)
+        # Explicit U layout: matching levels share Y; bottleneck sits below skips.
+        col_x = 2.55
+        level_y = (0.95, -0.85, -2.3)
+        for i, (e, d) in enumerate(zip(enc, dec)):
+            e.move_to(LEFT * col_x + UP * level_y[i])
+            d.move_to(RIGHT * col_x + UP * level_y[i])
+        bottom.move_to(DOWN * 3.35)
 
         enc_label = Text("nén", font=FONT, weight=BOLD, color=ACCENT_PURPLE,
-                         font_size=22).next_to(enc, UP, buff=0.25)
+                         font_size=22).next_to(enc[0], UP, buff=0.16)
         dec_label = Text("vẽ lại", font=FONT, weight=BOLD, color=ACCENT_PINK,
-                         font_size=22).next_to(dec, UP, buff=0.25)
+                         font_size=22).next_to(dec[0], UP, buff=0.16)
+
+        def stage_arrow(start, end) -> Arrow:
+            return Arrow(
+                start, end, buff=0.1,
+                color=MUTED_TEXT, stroke_width=4,
+                max_tip_length_to_length_ratio=0.32,
+                max_stroke_width_to_length_ratio=8,
+            )
 
         down_arrows = VGroup(
-            Arrow(enc[0].get_bottom(), enc[1].get_top(), buff=0.06,
-                  color=MUTED_TEXT, stroke_width=3.5, max_tip_length_to_length_ratio=0.3),
-            Arrow(enc[1].get_bottom(), enc[2].get_top(), buff=0.06,
-                  color=MUTED_TEXT, stroke_width=3.5, max_tip_length_to_length_ratio=0.3),
-            CurvedArrow(enc[2].get_bottom(), bottom.get_left(), angle=0.9,
-                        color=MUTED_TEXT, stroke_width=3.5),
+            stage_arrow(enc[0].get_bottom(), enc[1].get_top()),
+            stage_arrow(enc[1].get_bottom(), enc[2].get_top()),
+            CurvedArrow(
+                enc[2].get_bottom() + RIGHT * 0.15,
+                bottom.get_left() + UP * 0.1,
+                angle=0.75,
+                color=MUTED_TEXT,
+                stroke_width=4,
+            ),
         )
         up_arrows = VGroup(
-            CurvedArrow(bottom.get_right(), dec[2].get_bottom(), angle=0.9,
-                        color=MUTED_TEXT, stroke_width=3.5),
-            Arrow(dec[2].get_top(), dec[1].get_bottom(), buff=0.06,
-                  color=MUTED_TEXT, stroke_width=3.5, max_tip_length_to_length_ratio=0.3),
-            Arrow(dec[1].get_top(), dec[0].get_bottom(), buff=0.06,
-                  color=MUTED_TEXT, stroke_width=3.5, max_tip_length_to_length_ratio=0.3),
+            CurvedArrow(
+                bottom.get_right() + UP * 0.1,
+                dec[2].get_bottom() + LEFT * 0.15,
+                angle=0.75,
+                color=MUTED_TEXT,
+                stroke_width=4,
+            ),
+            stage_arrow(dec[2].get_top(), dec[1].get_bottom()),
+            stage_arrow(dec[1].get_top(), dec[0].get_bottom()),
         )
 
         skips = VGroup(*[
@@ -406,12 +426,12 @@ class Part2ModelOverview(Scene):
                 Arrow(
                     e.get_right(),
                     d.get_left(),
-                    buff=0.08,
+                    buff=0.12,
                     color=ACCENT_GREEN,
                     stroke_width=4,
-                    max_tip_length_to_length_ratio=0.25,
+                    max_tip_length_to_length_ratio=0.16,
                 ),
-                num_dashes=8,
+                num_dashes=9,
                 dashed_ratio=0.55,
             )
             for e, d in zip(enc, dec)
